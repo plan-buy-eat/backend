@@ -1,0 +1,1 @@
+./sdk-doctor-linux diagnose couchbase://couchbase-0000/default  -u Administrator -p eXBjQlpv

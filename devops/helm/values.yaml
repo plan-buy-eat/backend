@@ -1,0 +1,18 @@
+couchbaseOperator:
+  imagePullPolicy: Always
+users:
+  developer:
+    # When autobind is 'true' then the user is
+    # created and automatically bound to a group named 'developer'.
+    autobind: true
+    # password to use for user authentication
+    # (alternatively use authSecret)
+    password: password
+    # optional secret to use containing user password
+    authSecret:
+    # domain of user authentication
+    authDomain: local
+    # roles attributed to group
+    roles:
+      - name: bucket_admin
+        bucket: default

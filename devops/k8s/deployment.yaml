@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: service-app
+  name: service-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: service-app
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: service-app
+    spec:
+      containers:
+      - image: oltur/service1:$SERVICE_VERSION
+        name: service
+        resources: {}
+        imagePullPolicy: Always
+        ports:
+          - containerPort: 8080
+status: {}
