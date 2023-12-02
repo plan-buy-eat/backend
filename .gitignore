@@ -9,7 +9,8 @@
 *.dylib
 
 # env files
-.env*
+.env
+.env.docker
 
 # Test binary, built with `go test -c`
 *.test
