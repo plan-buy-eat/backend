@@ -58,3 +58,6 @@ terraform.rc
 
 
 sandbox/kubernetes/couchbase-autonomous-operator_2.5.0-180-kubernetes-macos-arm64/**
+
+
+.DS_Store
