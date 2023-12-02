@@ -1,1 +1,2 @@
-./sdk-doctor-linux diagnose couchbase://couchbase-0000/default  -u Administrator -p eXBjQlpv
+./sdk-doctor-linux diagnose couchbase://couchbase-0000.couchbase.default.svc,couchbase-0001.couchbase.default.svc,couchbase-0002.couchbase.default.svc/default  -u Administrator -p eXBjQlpv
+./sdk-doctor-linux diagnose couchbases://couchbase-0000.couchbase.default.svc,couchbase-0001.couchbase.default.svc,couchbase-0002.couchbase.default.svc/default  -u Administrator -p eXBjQlpv

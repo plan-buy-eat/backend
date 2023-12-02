@@ -15,29 +15,21 @@ RUN --mount=type=cache,mode=0755,target=/go/pkg/mod GOARCH=amd64 CGO_ENABLED=0 G
 
 # Deploy the application binary into a lean image
 #FROM gcr.io/distroless/base-debian11 AS build-release-stage
-#FROM alpine:latest AS build-release-stage
-FROM --platform=linux/amd64 ubuntu:latest AS build-release-stage
+FROM --platform=linux/amd64 alpine:latest AS build-release-stage
+#FROM --platform=linux/amd64 ubuntu:latest AS build-release-stage
 
-#RUN addgroup --system nonroot
-#RUN adduser --system nonroot --ingroup nonroot
-
+RUN addgroup --system nonroot
+RUN adduser --system nonroot --ingroup nonroot
 
 WORKDIR /
 
-RUN apt update
-RUN apt install -y wget
-RUN rm -rf /var/lib/apt/lists/*
-
-RUN wget https://github.com/couchbaselabs/sdk-doctor/releases/download/v1.0.8/sdk-doctor-linux
-
-RUN chmod u+x sdk-doctor-linux
-
 COPY --from=build-stage /usr/local/bin/app /app
+# TODO: remove
 COPY --from=build-stage /usr/src/app/.env.docker /.env
 
 EXPOSE 8080
 
-#USER nonroot:nonroot
+USER nonroot:nonroot
 
 ENTRYPOINT ["/app"]
 #CMD ["/bin/sh"]

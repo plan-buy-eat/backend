@@ -3,14 +3,14 @@ kind: Service
 metadata:
   creationTimestamp: null
   labels:
-    app: service-app
-  name: service-service
+    app: user-service
+  name: user-service
 spec:
   ports:
   - port: 8080
     protocol: TCP
     targetPort: 8080
   selector:
-    app: service-app
+    app: user-service
 status:
   loadBalancer: {}

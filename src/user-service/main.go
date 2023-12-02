@@ -20,13 +20,13 @@ func main() {
 
 		// Update this to your cluster details
 		// For a secure cluster connection, use `couchbases://<your-cluster-ip>` instead.
-		connectionString := os.Getenv("CONNECTION_STRING")
-		fmt.Println(connectionString)
+		connectionString := os.Getenv("COUCHBASE_CONNECTION_STRING")
 		//connectionString := "couchbase://127.0.0.1?network=external"
 		//connectionString := "127.0.0.1?network=external"
-		bucketName := "default"
-		username := "Administrator"
-		password := "eXBjQlpv"
+		bucketName := os.Getenv("COUCHBASE_BUCKET")
+		username := os.Getenv("COUCHBASE_USERNAME")
+		password := os.Getenv("COUCHBASE_USERNAME")
+		fmt.Println(connectionString, bucketName, username, password)
 
 		cluster, err := gocb.Connect(connectionString, gocb.ClusterOptions{
 			Authenticator: gocb.PasswordAuthenticator{

@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bastion
+spec:
+  containers:
+  - name: bastion
+    image: oltur/bastion:latest
+    command:
+      - "sleep"
+      - "604800"
+    imagePullPolicy: Always

@@ -3,23 +3,23 @@ kind: Deployment
 metadata:
   creationTimestamp: null
   labels:
-    app: service-app
-  name: service-app
+    app: user-service
+  name: user-service
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: service-app
+      app: user-service
   strategy: {}
   template:
     metadata:
       creationTimestamp: null
       labels:
-        app: service-app
+        app: user-service
     spec:
       containers:
-      - image: oltur/service1:$SERVICE_VERSION
-        name: service
+      - image: oltur/user-service:$SERVICE_VERSION
+        name: user-service
         resources: {}
         imagePullPolicy: Always
         ports:

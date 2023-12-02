@@ -1,4 +1,4 @@
-module github.com/shoppinglist/service
+module github.com/shoppinglist/user-service
 
 go 1.20
 
