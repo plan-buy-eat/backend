@@ -61,3 +61,5 @@ sandbox/kubernetes/couchbase-autonomous-operator_2.5.0-180-kubernetes-macos-arm6
 
 
 .DS_Store
+
+values.yaml
