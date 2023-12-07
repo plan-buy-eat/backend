@@ -4,7 +4,7 @@ on:
     - pull_request_target
 # on:
 #   pull_request:
-#     # branches: [main, 'fix/**', 'feature/**', 'release/**']
+#     # branches: [master, 'fix/**', 'feature/**', 'release/**']
 #     types: [opened, synchronize, reopened, ready_for_review]
 #   workflow_dispatch:
 
