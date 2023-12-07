@@ -1,4 +1,4 @@
-SERVICE_VERSION = 0.0.3
+SERVICE_VERSION = 0.0.4
 
 .PHONY: build-bastion
 build-bastion:
