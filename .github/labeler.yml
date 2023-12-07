@@ -1,0 +1,35 @@
+# https://github.com/actions/labeler
+
+root:
+- changed-files:
+  - any-glob-to-any-file: '*'
+
+chore:
+  - changed-files:
+    - any-glob-to-any-file: ['*', '.github/**/*']
+
+docs:
+  - changed-files:
+    - any-glob-to-any-file: ['/**/README*']
+
+devops:
+  - changed-files:
+    - any-glob-to-any-file: ['devops/**/*']
+
+frontend:
+  - changed-files:
+    - any-glob-to-any-file: ['**/*.js', '**/*.ts', '**/*.tsx']
+
+backend:
+  - changed-files:
+    - any-glob-to-any-file: ['**/go.sum', '**/*.go', '**/go.mod']
+
+release:
+ - base-branch: 'main'
+
+dev-branch:
+ - base-branch: 'dev'
+
+source:
+  - changed-files:
+    - any-glob-to-any-file: 'src/**/*'

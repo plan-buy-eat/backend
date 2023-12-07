@@ -1,0 +1,34 @@
+{{- if not (include "couchbase-cluster.tls.is-legacy" .) -}}
+{{ $tls := fromYaml ( include "couchbase-cluster.tls" . ) }}
+{{ $syncGatewayConfig := deepCopy .Values.syncGateway.config }}
+{{ if .Values.tls.generate }}
+---
+apiVersion: v1
+kind: Secret
+type: kubernetes.io/tls
+metadata:
+  name: {{ template "couchbase-cluster.tls.ca-secret" . }}
+data:
+  tls.crt: {{ $tls.caCert }}
+  tls.key: "" 
+---
+apiVersion: v1
+kind: Secret
+type: kubernetes.io/tls
+metadata:
+  name: {{ template "couchbase-cluster.tls.operator-secret" . }}
+data:
+  tls.crt: {{ $tls.clientCert }}
+  tls.key: {{ $tls.clientKey }}
+---
+apiVersion: v1
+kind: Secret
+type: kubernetes.io/tls
+metadata:
+  name: {{ template "couchbase-cluster.tls.server-secret" . }}
+data:
+  tls.crt: {{ $tls.serverCert }}
+  tls.key: {{ $tls.serverKey }}
+{{- end -}}
+{{- end -}}
+
