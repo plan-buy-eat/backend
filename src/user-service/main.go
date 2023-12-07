@@ -14,7 +14,7 @@ import (
 )
 
 func main() {
-	go func() {
+	c := func() {
 		// Uncomment following line to enable logging
 		//gocb.SetLogger(gocb.VerboseStdioLogger())
 
@@ -118,7 +118,9 @@ func main() {
 		//	return
 		//
 		//}
-	}()
+	}
+	_ = c
+	c()
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("HTTP %s %s%s\n", r.Method, r.Host, r.URL)
@@ -128,14 +130,16 @@ func main() {
 			return
 		}
 
-		w.Header().Set("Content-Type", "text/plain")
-		_, err := w.Write([]byte(time.Now().Local().Format(time.RFC1123Z)))
+		//w.Header().Set("Content-Type", "text/plain")
+		t := time.Now().Local().Format(time.RFC1123Z)
+		log.Printf("response %s\n", t)
+		_, err := w.Write([]byte(t + "\n"))
 		if err != nil {
 			log.Printf("Error writing response: %v", err)
 		}
 	})
 
-	listenAddress := ":8080"
+	listenAddress := ":80"
 	log.Printf("Listening at %s", listenAddress)
 
 	httpServer := http.Server{

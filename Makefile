@@ -1,4 +1,4 @@
-SERVICE_VERSION = 0.0.2
+SERVICE_VERSION = 0.0.3
 
 .PHONY: build-bastion
 build-bastion:
@@ -13,35 +13,35 @@ install-bastion: #build-bastion
 uninstall-bastion: #build-bastion
 	helm uninstall bastion-host
 
-.PHONY: docker-build-user-service
-docker-build-user-service:
+.PHONY: build-user-service
+build-user-service:
 	docker build -t oltur/user-service:$(SERVICE_VERSION) src/user-service
 	docker push oltur/user-service:$(SERVICE_VERSION)
 
-.PHONY: docker-build-user-service-debug
-docker-build-user-service-debug:
+.PHONY: build-user-service-debug
+build-user-service-debug:
 	docker build -t oltur/user-service:$(SERVICE_VERSION) src/user-service -f src/user-service/debug.Dockerfile
 	docker push oltur/user-service:$(SERVICE_VERSION)
 
-.PHONY: kube-deploy-user-service
-kube-deploy-user-service: docker-build-user-service
+.PHONY: deploy-user-service
+deploy-user-service: build-user-service
 	# kind load docker-image user-service:
-	SERVICE_VERSION=$(SERVICE_VERSION) envsubst < devops/k8s/deployment-user-service.yaml | kubectl apply -f -
-	kubectl apply -f devops/k8s/service-user-service.yaml
-	kubectl apply -f devops/k8s/ingress-user-service.yaml
+	SERVICE_VERSION=$(SERVICE_VERSION) envsubst < devops/user-service/templates/deployment.yaml | kubectl apply -f -
+	kubectl apply -f devops/user-service/templates/service.yaml
+	kubectl apply -f devops/user-service/templates/ingress.yaml
 
-.PHONY: kube-deploy-user-service-debug
-kube-deploy-user-service-debug: docker-build-user-service-debug
+.PHONY: deploy-debug
+deploy-user-service-debug: build-user-service-debug
 	# kind load docker-image user-service:
-	SERVICE_VERSION=$(SERVICE_VERSION) envsubst < devops/k8s/deployment-user-service-debug.yaml | kubectl apply -f -
-	kubectl apply -f devops/k8s/service-user-service.yaml
-	kubectl apply -f devops/k8s/ingress-user-service.yaml
+	SERVICE_VERSION=$(SERVICE_VERSION) envsubst < devops/user-service/templates/deployment-debug.yaml | kubectl apply -f -
+	kubectl apply -f devops/user-service/templates/service.yaml
+	kubectl apply -f devops/user-service/templates/ingress.yaml
 
-.PHONY: kube-delete-user-service
-kube-delete-user-service:
-	kubectl delete -f devops/k8s/ingress.yaml
-	kubectl delete -f devops/k8s/service.yaml
-	kubectl delete deployment service-app
+.PHONY: delete-user-service
+delete-user-service:
+	kubectl delete -f devops/user-service/templates/ingress.yaml
+	kubectl delete -f devops/user-service/templates/service.yaml
+	kubectl delete deployment user-service
 
 .PHONY: install-couchbase
 install-couchbase:
@@ -60,7 +60,7 @@ status-couchbase:
 
 .PHONY: install-test-service
 install-test-service:
-	helm install test-service --namespace test --values devops/test-service/values.yaml  ./devops/test-service
+	helm install test-service --values devops/test-service/values.yaml  ./devops/test-service # --namespace test
 
 .PHONY: uninstall-test-service
 uninstall-test-service:
@@ -87,3 +87,7 @@ delete-kind-cluster:
 .PHONY: install-ingress-example
 install-ingress-example:
 	helm install ingress-example ./devops/kind/ingress-example
+
+.PHONY: uninstall-ingress-example
+uninstall-ingress-example:
+	helm uninstall ingress-example

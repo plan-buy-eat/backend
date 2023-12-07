@@ -1,10 +1,8 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  creationTimestamp: null
   labels:
     app: user-service
-    debug: "true"
   name: user-service
 spec:
   replicas: 1
@@ -14,16 +12,12 @@ spec:
   strategy: {}
   template:
     metadata:
-      creationTimestamp: null
       labels:
         app: user-service
-        debug: "true"
     spec:
       containers:
       - image: oltur/user-service:$SERVICE_VERSION
         name: user-service
-        resources: {}
         imagePullPolicy: Always
         ports:
-          - containerPort: 8080
-status: {}
+          - containerPort: 80

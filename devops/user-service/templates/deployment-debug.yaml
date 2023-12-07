@@ -4,6 +4,7 @@ metadata:
   creationTimestamp: null
   labels:
     app: user-service
+    debug: "true"
   name: user-service
 spec:
   replicas: 1
@@ -16,6 +17,7 @@ spec:
       creationTimestamp: null
       labels:
         app: user-service
+        debug: "true"
     spec:
       containers:
       - image: oltur/user-service:$SERVICE_VERSION
@@ -23,5 +25,4 @@ spec:
         resources: {}
         imagePullPolicy: Always
         ports:
-          - containerPort: 8080
-status: {}
+          - containerPort: 80
