@@ -1,0 +1,43 @@
+name: "PR: label"
+
+on:
+    - pull_request_target
+# on:
+#   pull_request:
+#     # branches: [main, 'fix/**', 'feature/**', 'release/**']
+#     types: [opened, synchronize, reopened, ready_for_review]
+#   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  label:
+    name: Label
+    runs-on: ubuntu-latest
+    # runs-on: checks-stateful-runners
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Standard labels
+        uses: actions/labeler@v5
+        with:
+          repo-token: "${{ secrets.GITHUB_TOKEN }}"
+    #   - name: JIRA priority labels
+    #     uses: xserrat/pr-jira-properties-labeler@846b66cfb64dfe1058dd5acb31c0ba7160130c91
+    #     with:
+    #       JIRA_URI: "${{ secrets.JIRA_URI }}"
+    #       GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+    #       JIRA_ENCODED_TOKEN: "${{ secrets.JIRA_ENCODED_TOKEN }}"
+    #       regexp_jira_issue_code_on_pr_title: '^([A-Z]{4}-[0-9]{4}).*'
+    #       issue_properties: '[priority]'
+    #   - name: JIRA type labels
+    #     uses: hometeam/jira-label-action@e24382437517d3de37bfb2c85af18d01bc95a3d5
+    #     with:
+    #       jira-url: '${{ secrets.JIRA_URI }}'
+    #       repo-token: '${{ secrets.GITHUB_TOKEN }}'
+    #       jira-username: '${{ secrets.JIRA_USERNAME }}'
+    #       jira-token: '${{ secrets.JIRA_TOKEN }}'
+    #       ticket-regex: '^([A-Z]{4}-[0-9]{4}).*'
