@@ -27,9 +27,21 @@ COPY --from=build-stage /usr/local/bin/app /app
 # TODO: remove
 COPY --from=build-stage /usr/src/app/.env.docker /.env
 
+RUN apk add libcap && setcap 'cap_net_bind_service=+ep' /app
+
 EXPOSE 8080
 
 USER nonroot:nonroot
+
+ARG COUCHBASE_CONNECTION_STRING
+ARG COUCHBASE_USERNAME
+ARG COUCHBASE_PASSWORD
+ARG COUCHBASE_BUCKET
+
+ENV COUCHBASE_CONNECTION_STRING couchbase://couchbase-0000
+ENV COUCHBASE_USERNAME Administrator
+ENV COUCHBASE_PASSWORD $COUCHBASE_PASSWORD
+ENV COUCHBASE_BUCKET default
 
 ENTRYPOINT ["/app"]
 #CMD ["/bin/sh"]

@@ -25,7 +25,7 @@ func main() {
 		//connectionString := "127.0.0.1?network=external"
 		bucketName := os.Getenv("COUCHBASE_BUCKET")
 		username := os.Getenv("COUCHBASE_USERNAME")
-		password := os.Getenv("COUCHBASE_USERNAME")
+		password := os.Getenv("COUCHBASE_PASSWORD")
 		fmt.Println(connectionString, bucketName, username, password)
 
 		cluster, err := gocb.Connect(connectionString, gocb.ClusterOptions{
@@ -51,6 +51,7 @@ func main() {
 		// Get a reference to the default collection, required for older Couchbase server versions
 		// col := bucket.DefaultCollection()
 
+		// TODO: create scope and collections if not exists
 		col := bucket.Scope("0").Collection("users")
 
 		type User struct {

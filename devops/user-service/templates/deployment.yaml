@@ -1,3 +1,4 @@
+{{ if not .Values.DEBUG }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -16,8 +17,21 @@ spec:
         app: user-service
     spec:
       containers:
-      - image: oltur/user-service:$SERVICE_VERSION
+      - image: "oltur/user-service:{{ .Values.SERVICE_VERSION }}"
         name: user-service
         imagePullPolicy: Always
         ports:
           - containerPort: 80
+        env:
+        - name: "COUCHBASE_PASSWORD"
+          valueFrom:
+            secretKeyRef:
+              key:  COUCHBASE_PASSWORD
+              name: {{ .Release.Name }}-db
+        - name: "COUCHBASE_CONNECTION_STRING"
+          value: {{ .Values.COUCHBASE_CONNECTION_STRING }}
+        - name: "COUCHBASE_USERNAME"
+          value: {{ .Values.COUCHBASE_USERNAME }}
+        - name: "COUCHBASE_BUCKET"
+          value: {{ .Values.COUCHBASE_BUCKET }}
+{{end}}

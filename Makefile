@@ -1,4 +1,8 @@
-SERVICE_VERSION = 0.0.4
+SERVICE_VERSION = 0.0.7
+
+all:
+	$(eval GIT_BRANCH=$(shell git rev-parse --abbrev-ref HEAD))
+	echo "Git branch is $(GIT_BRANCH)"
 
 .PHONY: build-bastion
 build-bastion:
@@ -15,33 +19,35 @@ uninstall-bastion: #build-bastion
 
 .PHONY: build-user-service
 build-user-service:
-	docker build -t oltur/user-service:$(SERVICE_VERSION) src/user-service
+	$(eval COUCHBASE_PASSWORD=$(shell helm status couchbase  | sed -n -e 's/^.*password: //p'))
+	docker build -t oltur/user-service:$(SERVICE_VERSION)  --build-arg COUCHBASE_PASSWORD=$(COUCHBASE_PASSWORD) src/user-service
 	docker push oltur/user-service:$(SERVICE_VERSION)
+	rm password.txt
 
 .PHONY: build-user-service-debug
 build-user-service-debug:
-	docker build -t oltur/user-service:$(SERVICE_VERSION) src/user-service -f src/user-service/debug.Dockerfile
-	docker push oltur/user-service:$(SERVICE_VERSION)
+	docker build -t oltur/user-service:debug-$(SERVICE_VERSION) src/user-service -f src/user-service/debug.Dockerfile
+	docker push oltur/user-service:debug-$(SERVICE_VERSION)
 
-.PHONY: deploy-user-service
-deploy-user-service: build-user-service
+.PHONY: install-user-service
+install-user-service: # build-user-service
 	# kind load docker-image user-service:
-	SERVICE_VERSION=$(SERVICE_VERSION) envsubst < devops/user-service/templates/deployment.yaml | kubectl apply -f -
-	kubectl apply -f devops/user-service/templates/service.yaml
-	kubectl apply -f devops/user-service/templates/ingress.yaml
+	$(eval COUCHBASE_PASSWORD=$(shell helm status couchbase  | sed -n -e 's/^.*password: //p'))
+	$(eval SERVICE_VERSION=$(SERVICE_VERSION))
+	$(eval DEBUG=false)
+	helm install user-service --values devops/user-service/values.yaml --set DEBUG=$(DEBUG) --set COUCHBASE_PASSWORD=$(COUCHBASE_PASSWORD) --set SERVICE_VERSION=$(SERVICE_VERSION) devops/user-service
 
-.PHONY: deploy-debug
-deploy-user-service-debug: build-user-service-debug
+.PHONY: install-user-service-debug
+install-user-service-debug: # build-user-service-debug
 	# kind load docker-image user-service:
-	SERVICE_VERSION=$(SERVICE_VERSION) envsubst < devops/user-service/templates/deployment-debug.yaml | kubectl apply -f -
-	kubectl apply -f devops/user-service/templates/service.yaml
-	kubectl apply -f devops/user-service/templates/ingress.yaml
+	$(eval COUCHBASE_PASSWORD=$(shell helm status couchbase  | sed -n -e 's/^.*password: //p'))
+	$(eval SERVICE_VERSION=$(SERVICE_VERSION))
+	$(eval DEBUG=true)
+	helm install user-service --values devops/user-service/values.yaml --set DEBUG=$(DEBUG) --set COUCHBASE_PASSWORD=$(COUCHBASE_PASSWORD) --set SERVICE_VERSION=$(SERVICE_VERSION) devops/user-service
 
-.PHONY: delete-user-service
-delete-user-service:
-	kubectl delete -f devops/user-service/templates/ingress.yaml
-	kubectl delete -f devops/user-service/templates/service.yaml
-	kubectl delete deployment user-service
+.PHONY: uninstall-user-service
+uninstall-user-service:
+	helm uninstall user-service
 
 .PHONY: install-couchbase
 install-couchbase:

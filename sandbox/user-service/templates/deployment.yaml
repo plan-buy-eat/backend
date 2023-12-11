@@ -1,11 +1,8 @@
-{{ if .Values.DEBUG }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  creationTimestamp: null
   labels:
     app: user-service
-    debug: "true"
   name: user-service
 spec:
   replicas: 1
@@ -15,16 +12,12 @@ spec:
   strategy: {}
   template:
     metadata:
-      creationTimestamp: null
       labels:
         app: user-service
-        debug: "true"
     spec:
       containers:
-      - image: "oltur/user-service:{{ .Values.SERVICE_VERSION }}"
+      - image: oltur/user-service:0.0.6
         name: user-service
-        resources: {}
         imagePullPolicy: Always
         ports:
           - containerPort: 80
-{{end}}
