@@ -1,9 +1,15 @@
-module github.com/shoppinglist/user-service
+module github.com/shoppinglist
 
 go 1.20
 
 require (
-	github.com/couchbase/gocb/v2 v2.7.0 // indirect
+	github.com/couchbase/gocb/v2 v2.7.0
+	github.com/davecgh/go-spew v1.1.1
+	github.com/joho/godotenv v1.5.1
+	github.com/rs/xid v1.5.0
+)
+
+require (
 	github.com/couchbase/gocbcore/v10 v10.3.0 // indirect
 	github.com/couchbase/gocbcoreps v0.1.0 // indirect
 	github.com/couchbase/goprotostellar v1.0.0 // indirect
@@ -12,7 +18,6 @@ require (
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/uuid v1.3.1 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 // indirect
-	github.com/joho/godotenv v1.5.1 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.26.0 // indirect
 	golang.org/x/net v0.17.0 // indirect

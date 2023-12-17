@@ -3,24 +3,24 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: user-service
+    app: {{ .Values.SERVICE_NAME }}
     debug: "true"
-  name: user-service
+  name: {{ .Values.SERVICE_NAME }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: user-service
+      app: {{ .Values.SERVICE_NAME }}
   strategy: {}
   template:
     metadata:
       labels:
-        app: user-service
+        app: {{ .Values.SERVICE_NAME }}
         debug: "true"
     spec:
       containers:
-      - image: "oltur/user-service:{{ .Values.SERVICE_VERSION }}"
-        name: user-service
+      - image: "oltur/{{ .Values.SERVICE_NAME }}:{{ .Values.SERVICE_VERSION }}"
+        name: {{ .Values.SERVICE_NAME }}
         resources: {}
         imagePullPolicy: Always
         ports:

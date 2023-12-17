@@ -3,22 +3,23 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: user-service
-  name: user-service
+    app: {{ .Values.SERVICE_NAME }}
+  name: {{ .Values.SERVICE_NAME }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: user-service
+      app: {{ .Values.SERVICE_NAME }}
   strategy: {}
   template:
     metadata:
       labels:
-        app: user-service
+        app: {{ .Values.SERVICE_NAME }}
+        date: "{{ now | unixEpoch }}"
     spec:
       containers:
-      - image: "oltur/user-service:{{ .Values.SERVICE_VERSION }}"
-        name: user-service
+      - image: "oltur/{{ .Values.SERVICE_NAME }}:{{ .Values.SERVICE_VERSION }}"
+        name: {{ .Values.SERVICE_NAME }}
         imagePullPolicy: Always
         ports:
           - containerPort: 80
@@ -27,7 +28,7 @@ spec:
           valueFrom:
             secretKeyRef:
               key:  COUCHBASE_PASSWORD
-              name: {{ .Release.Name }}-db
+              name: {{ .Release.Name }}-{{ .Values.SERVICE_NAME }}-db
         - name: "COUCHBASE_CONNECTION_STRING"
           value: {{ .Values.COUCHBASE_CONNECTION_STRING }}
         - name: "COUCHBASE_USERNAME"
