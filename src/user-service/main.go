@@ -26,7 +26,7 @@ func main() {
 		bucketName := os.Getenv("COUCHBASE_BUCKET")
 		username := os.Getenv("COUCHBASE_USERNAME")
 		password := os.Getenv("COUCHBASE_PASSWORD")
-		fmt.Println(connectionString, bucketName, username, password)
+		fmt.Print(connectionString, bucketName, username, password)
 
 		cluster, err := gocb.Connect(connectionString, gocb.ClusterOptions{
 			Authenticator: gocb.PasswordAuthenticator{
@@ -35,7 +35,7 @@ func main() {
 			},
 		})
 		if err != nil {
-			log.Println(err)
+			log.Print(err)
 			return
 		}
 
@@ -43,7 +43,7 @@ func main() {
 
 		err = bucket.WaitUntilReady(5*time.Second, nil)
 		if err != nil {
-			log.Println(err)
+			log.Print(err)
 			return
 
 		}
@@ -68,7 +68,7 @@ func main() {
 				Interests: []string{"Swimming", "Rowing"},
 			}, nil)
 		if err != nil {
-			log.Println(err)
+			log.Print(err)
 			return
 
 		}
@@ -76,7 +76,7 @@ func main() {
 		// Get the document back
 		getResult, err := col.Get("u:jade", nil)
 		if err != nil {
-			log.Println(err)
+			log.Print(err)
 			return
 
 		}
@@ -84,7 +84,7 @@ func main() {
 		var inUser User
 		err = getResult.Content(&inUser)
 		if err != nil {
-			log.Println(err)
+			log.Print(err)
 			return
 
 		}
@@ -97,7 +97,7 @@ func main() {
 		//	&gocb.QueryOptions{Adhoc: true},
 		//)
 		//if err != nil {
-		//	log.Println(err)
+		//	log.Print(err)
 		//	return
 		//
 		//}
@@ -107,15 +107,15 @@ func main() {
 		//	var result interface{}
 		//	err := queryResult.Row(&result)
 		//	if err != nil {
-		//		log.Println(err)
+		//		log.Print(err)
 		//		return
 		//
 		//	}
-		//	fmt.Println(result)
+		//	fmt.Print(result)
 		//}
 		//
 		//if err := queryResult.Err(); err != nil {
-		//	log.Println(err)
+		//	log.Print(err)
 		//	return
 		//
 		//}
@@ -159,7 +159,7 @@ func main() {
 	}()
 
 	if err := httpServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-		log.Fatalf("HTTP server ListenAndServe Error: %v", err)
+		log.Fatal().Err(err).Msgf("HTTP server ListenAndServe Error")
 	}
 
 	<-idleConnectionsClosed
