@@ -5,11 +5,11 @@ WORKDIR /usr/src/app
 RUN --mount=type=cache,mode=0755,target=/go/pkg/mod- CGO_ENABLED=0 go install github.com/go-delve/delve/cmd/dlv@latest
 
 # pre-copy/cache go.mod for pre-downloading dependencies and only redownloading them in subsequent builds if they change
-COPY go.mod go.sum ./
+COPY ../../go.mod ../../go.sum ./
 RUN go mod download && go mod verify
 
 COPY . .
-RUN --mount=type=cache,mode=0755,target=/go/pkg/mod CGO_ENABLED=0 go build -v -o /usr/local/bin/app ./...
+RUN --mount=type=cache,mode=0755,target=/go/pkg/mod CGO_ENABLED=0 go build -v -o /usr/local/bin/app ./item-service/main.go
 
 ## Run the tests in the container
 #FROM build-stage AS run-test-stage

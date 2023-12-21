@@ -8,8 +8,8 @@ import (
 	"github.com/couchbase/gocb/v2/search"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/rs/xid"
+	"github.com/shoppinglist/log"
 	"github.com/shoppinglist/models"
-	"log"
 	"os"
 	"time"
 )
@@ -18,7 +18,7 @@ type DB interface {
 	UpsertItem(ctx context.Context, inId string, item *models.Item) (id string, err error)
 	GetItem(ctx context.Context, id string) (item *models.Item, err error)
 	GetAllItems(ctx context.Context) (items []*models.Item, err error)
-	SearchItems(ctx context.Context, index string, query string) (res []*models.ItemSearchResult, err error)
+	SearchItems(ctx context.Context, index string, query string) (res []*models.SearchResult[models.Item], err error)
 	DeleteItem(ctx context.Context, id string) (err error)
 }
 
@@ -52,7 +52,7 @@ func NewDB(ctx context.Context) (DB, error) {
 		},
 	})
 	if err != nil {
-		log.Println(err)
+		log.Logger().Err(err)
 		return nil, err
 	}
 
@@ -65,7 +65,7 @@ func NewDB(ctx context.Context) (DB, error) {
 		Context: ctx,
 	})
 	if err != nil {
-		log.Println(err)
+		log.Logger().Err(err)
 		return nil, err
 	}
 
@@ -75,7 +75,7 @@ func NewDB(ctx context.Context) (DB, error) {
 		&gocb.CreateScopeOptions{Context: ctx})
 	if err != nil {
 		if !errors.Is(err, gocb.ErrScopeExists) {
-			log.Println(err)
+			log.Logger().Err(err)
 			return nil, err
 		}
 	}
@@ -88,7 +88,7 @@ func NewDB(ctx context.Context) (DB, error) {
 	})
 	if err != nil {
 		if !errors.Is(err, gocb.ErrCollectionExists) {
-			log.Println(err)
+			log.Logger().Err(err)
 			return nil, err
 		}
 	}
@@ -96,7 +96,7 @@ func NewDB(ctx context.Context) (DB, error) {
 
 	if err = d.queryIndexManager.CreatePrimaryIndex(bucketName, nil); err != nil {
 		if !errors.Is(err, gocb.ErrIndexExists) {
-			log.Println(err)
+			log.Logger().Err(err)
 			return nil, err
 		}
 	}
@@ -105,7 +105,7 @@ func NewDB(ctx context.Context) (DB, error) {
 		if err := d.queryIndexManager.CreateIndex(d.bucket.Name(), "ix_"+fieldName, []string{fieldName},
 			&gocb.CreateQueryIndexOptions{Context: ctx}); err != nil {
 			if !errors.Is(err, gocb.ErrIndexExists) {
-				log.Println(err)
+				log.Logger().Err(err)
 				return nil, err
 			}
 		}
@@ -144,11 +144,11 @@ func (d *db) UpsertItem(ctx context.Context, inId string, item *models.Item) (ou
 	_, err = d.items.Upsert(outId, item,
 		&gocb.UpsertOptions{Context: ctx})
 	if err != nil {
-		log.Println(err)
+		log.Logger().Err(err)
 		return
 
 	}
-	log.Printf("Item created: %s\n", inId)
+	log.Logger().Info().Msgf("Item created: %s\n", inId)
 	return
 }
 
@@ -159,7 +159,7 @@ func (d *db) GetItem(ctx context.Context, id string) (item *models.Item, err err
 	getResult, err := d.items.Get(id,
 		&gocb.GetOptions{Context: ctx})
 	if err != nil {
-		log.Println(err)
+		log.Logger().Err(err)
 		return
 
 	}
@@ -167,7 +167,7 @@ func (d *db) GetItem(ctx context.Context, id string) (item *models.Item, err err
 	item = &models.Item{}
 	err = getResult.Content(item)
 	if err != nil {
-		log.Println(err)
+		log.Logger().Err(err)
 		return
 
 	}
@@ -182,7 +182,7 @@ func (d *db) GetAllItems(ctx context.Context) (items []*models.Item, err error) 
 		&gocb.QueryOptions{Adhoc: true, Context: ctx},
 	)
 	if err != nil {
-		log.Println(err)
+		log.Logger().Err(err)
 		return
 	}
 
@@ -191,14 +191,14 @@ func (d *db) GetAllItems(ctx context.Context) (items []*models.Item, err error) 
 		var item models.Item
 		err = queryResult.Row(&item)
 		if err != nil {
-			log.Println(err)
+			log.Logger().Err(err)
 			return
 		}
 		items = append(items, &item)
 	}
 
 	if err = queryResult.Err(); err != nil {
-		log.Println(err)
+		log.Logger().Err(err)
 		return
 	}
 
@@ -206,7 +206,7 @@ func (d *db) GetAllItems(ctx context.Context) (items []*models.Item, err error) 
 	return
 }
 
-func (d *db) SearchItems(ctx context.Context, index string, query string) (itemSearchResults []*models.ItemSearchResult, err error) {
+func (d *db) SearchItems(ctx context.Context, index string, query string) (itemSearchResults []*models.SearchResult[models.Item], err error) {
 	matchResult, err := d.cluster.SearchQuery(
 		index,
 		search.NewConjunctionQuery(
@@ -225,20 +225,20 @@ func (d *db) SearchItems(ctx context.Context, index string, query string) (itemS
 
 	// Print each found Row
 	for matchResult.Next() {
-		var itemSearchResult models.ItemSearchResult
+		var itemSearchResult models.SearchResult[models.Item]
 		row := matchResult.Row()
 		itemSearchResult.ID = row.ID
 		itemSearchResult.Score = row.Score
-		err = row.Fields(&itemSearchResult.Item)
+		err = row.Fields(&itemSearchResult.Data)
 		if err != nil {
-			log.Println(err)
+			log.Logger().Err(err)
 			return
 		}
 		itemSearchResults = append(itemSearchResults, &itemSearchResult)
 	}
 
 	if err = matchResult.Err(); err != nil {
-		log.Println(err)
+		log.Logger().Err(err)
 		return
 	}
 
@@ -251,9 +251,9 @@ func (d *db) DeleteItem(ctx context.Context, id string) (err error) {
 	_, err = d.items.Remove(id,
 		&gocb.RemoveOptions{Context: ctx})
 	if err != nil {
-		log.Println(err)
+		log.Logger().Err(err)
 		return
 	}
-	log.Printf("Item deleted: %s\n", id)
+	log.Logger().Info().Msgf("Item deleted: %s\n", id)
 	return
 }

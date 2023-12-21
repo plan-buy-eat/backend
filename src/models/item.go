@@ -8,8 +8,8 @@ type Item struct {
 	Bought bool   `json:"bought"`
 }
 
-type ItemSearchResult struct {
-	Item
+type SearchResult[T any] struct {
+	Data  T       `json:"data"`
 	ID    string  `json:"id"`
 	Score float64 `json:"score"`
 }

@@ -36,12 +36,12 @@ upgrade-all-debug: upgrade-item-service-debug upgrade-user-service-debug
 .PHONY: build-user-service
 build-user-service:
 	$(eval COUCHBASE_PASSWORD=$(shell helm status couchbase  | sed -n -e 's/^.*password: //p'))
-	docker build -t oltur/user-service:$(SERVICE_VERSION) --build-arg SERVICE_NAME=user-service --build-arg COUCHBASE_PASSWORD=$(COUCHBASE_PASSWORD) src/user-service
+	docker build -t oltur/user-service:$(SERVICE_VERSION) --build-arg SERVICE_NAME=user-service --build-arg COUCHBASE_PASSWORD=$(COUCHBASE_PASSWORD) -f src/user-service/Dockerfile ./src
 	docker push oltur/user-service:$(SERVICE_VERSION)
 
 .PHONY: build-user-service-debug
 build-user-service-debug:
-	docker build -t oltur/user-service:debug-$(SERVICE_VERSION) src/user-service -f src/user-service/debug.Dockerfile
+	docker build -t oltur/user-service:debug-$(SERVICE_VERSION)  --build-arg SERVICE_NAME=user-service --build-arg COUCHBASE_PASSWORD=$(COUCHBASE_PASSWORD) -f src/user-service/Dockerfile ./src
 	docker push oltur/user-service:debug-$(SERVICE_VERSION)
 
 .PHONY: install-user-service
@@ -85,12 +85,12 @@ uninstall-user-service:
 .PHONY: build-item-service
 build-item-service:
 	$(eval COUCHBASE_PASSWORD=$(shell helm status couchbase  | sed -n -e 's/^.*password: //p'))
-	docker build -t oltur/item-service:$(SERVICE_VERSION) --build-arg SERVICE_NAME=user-service --build-arg COUCHBASE_PASSWORD=$(COUCHBASE_PASSWORD) src/item-service
+	docker build -t oltur/item-service:$(SERVICE_VERSION) --build-arg SERVICE_NAME=user-service --build-arg COUCHBASE_PASSWORD=$(COUCHBASE_PASSWORD) -f src/item-service/Dockerfile ./src
 	docker push oltur/item-service:$(SERVICE_VERSION)
 
 .PHONY: build-item-service-debug
 build-item-service-debug:
-	docker build -t oltur/item-service:debug-$(SERVICE_VERSION) src/item-service -f src/item-service/debug.Dockerfile
+	docker build -t oltur/item-service:debug-$(SERVICE_VERSION) --build-arg SERVICE_NAME=user-service --build-arg COUCHBASE_PASSWORD=$(COUCHBASE_PASSWORD) -f src/item-service/debug.Dockerfile ./src
 	docker push oltur/item-service:debug-$(SERVICE_VERSION)
 
 .PHONY: install-item-service
@@ -115,7 +115,7 @@ upgrade-item-service: # build-item-service
 	$(eval COUCHBASE_PASSWORD=$(shell helm status couchbase  | sed -n -e 's/^.*password: //p'))
 	$(eval SERVICE_VERSION=$(SERVICE_VERSION))
 	$(eval DEBUG=false)
-	helm upgrade user-service --values devops/item-service/values.yaml --set SERVICE_NAME=item-service --set DEBUG=$(DEBUG) --set COUCHBASE_PASSWORD=$(COUCHBASE_PASSWORD) --set SERVICE_VERSION=$(SERVICE_VERSION) devops/service
+	helm upgrade item-service --values devops/item-service/values.yaml --set SERVICE_NAME=item-service --set DEBUG=$(DEBUG) --set COUCHBASE_PASSWORD=$(COUCHBASE_PASSWORD) --set SERVICE_VERSION=$(SERVICE_VERSION) devops/service
 
 .PHONY: upgrade-item-service-debug
 upgrade-item-service-debug: # build-item-service-debug

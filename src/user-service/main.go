@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"github.com/couchbase/gocb/v2"
 	_ "github.com/joho/godotenv/autoload"
-	"log"
+	"github.com/rs/zerolog/log"
 	"net/http"
 	"os"
 	"os/signal"
