@@ -59,6 +59,8 @@ override.tf.json
 .terraformrc
 terraform.rc
 
+devops/k8s/
+
 .DS_Store
 
 
