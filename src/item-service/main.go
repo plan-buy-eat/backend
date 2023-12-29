@@ -20,31 +20,69 @@ import (
 
 var serviceName string
 
+func CORS(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Access-Control-Allow-Origin", "*")
+		w.Header().Add("Access-Control-Allow-Credentials", "true")
+		w.Header().Add("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
+		w.Header().Add("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+		w.Header().Add("Access-Control-Expose-Headers", "X-Total-Count")
+
+		if r.Method == "OPTIONS" {
+			http.Error(w, "No Content", http.StatusNoContent)
+			return
+		}
+
+		next(w, r)
+	}
+}
+
 func main() {
 	serviceName = os.Getenv("SERVICE_NAME")
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+	log.Logger().Info().Any("env", os.Environ()).Msgf("Env")
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/", CORS(func(w http.ResponseWriter, r *http.Request) {
 		log.Logger().Info().Msgf("HTTP %s %s%s\n", r.Method, r.Host, r.URL)
 
-		if r.URL.Path == "/init" && r.Method == "GET" {
+		if r.URL.Path == "/items" && r.Method == "GET" {
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("X-Total-Count", "10")
+			_, err := w.Write([]byte("[{\"id\":1,\"name\":\"test\"}]"))
+			if err != nil {
+				log.Logger().Err(err).Msg("Error writing response")
+				http.Error(w, "Server Error", http.StatusInternalServerError)
+				return
+			}
+		} else if r.URL.Path == "/init" && r.Method == "GET" {
 			err := initDB()
 			if err != nil {
-
+				log.Logger().Err(err).Msg("Error in init")
+				http.Error(w, "Server Error", http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "text/plain")
+			_, err = w.Write([]byte("OK\n"))
+			if err != nil {
+				log.Logger().Err(err).Msg("Error writing response")
+				http.Error(w, "Server Error", http.StatusInternalServerError)
+				return
 			}
 		} else if r.URL.Path == "/healthz" && r.Method == "GET" {
-			//w.Header().Set("Content-Type", "text/plain")
+			w.Header().Set("Content-Type", "text/plain")
 			t := fmt.Sprintf("%s: %s\n", serviceName, time.Now().Local().Format(time.RFC1123Z))
 			log.Logger().Printf("response %s\n", t)
 			_, err := w.Write([]byte(t + "\n"))
 			if err != nil {
-				log.Logger().Printf("Error writing response: %v", err)
+				log.Logger().Err(err).Msg("Error writing response")
+				http.Error(w, "Server Error", http.StatusInternalServerError)
+				return
 			}
 		} else {
 			http.Error(w, "Not Found", http.StatusNotFound)
 			return
 		}
-	})
+	}))
 
 	port := config.GetValue("PORT", "80")
 	listenAddress := ":" + port

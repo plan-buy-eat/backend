@@ -43,7 +43,6 @@ func NewDB(ctx context.Context) (DB, error) {
 	bucketName := os.Getenv("COUCHBASE_BUCKET")
 	username := os.Getenv("COUCHBASE_USERNAME")
 	password := os.Getenv("COUCHBASE_PASSWORD")
-	//fmt.Println(connectionString, bucketName, username, password)
 
 	d.cluster, err = gocb.Connect(connectionString, gocb.ClusterOptions{
 		Authenticator: gocb.PasswordAuthenticator{

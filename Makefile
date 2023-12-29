@@ -1,4 +1,4 @@
-SERVICE_VERSION = 0.0.8
+SERVICE_VERSION = 0.0.10
 
 all:
 	$(eval GIT_BRANCH=$(shell git rev-parse --abbrev-ref HEAD))
@@ -126,6 +126,27 @@ upgrade-item-service-debug: # build-item-service-debug
 .PHONY: uninstall-item-service
 uninstall-item-service:
 	helm uninstall item-service
+#====================================
+.PHONY: install-monitoring
+install-monitoring:
+	helm install kube-prometheus-stack prometheus-community/kube-prometheus-stack --namespace monitoring --create-namespace
+
+.PHONY: uninstall-monitoring
+uninstall-monitoring:
+	helm uninstall kube-prometheus-stack --namespace monitoring
+
+.PHONY: install-traefik
+install-traefik:
+	helm repo add traefik https://traefik.github.io/charts
+	helm install traefik traefik/traefik
+
+.PHONY: uninstall-traefik
+uninstall-traefik:
+	helm uninstall traefik
+
+.PHONY: expose-traefik-dashboard
+expose-traefik-dashboard:
+	kubectl port-forward $(kubectl get pods --selector "app.kubernetes.io/name=traefik" --output=name) 9000:9000
 
 #==================================================================================================
 .PHONY: install-couchbase-local
