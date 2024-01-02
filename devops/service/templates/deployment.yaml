@@ -6,7 +6,7 @@ metadata:
     app: {{ .Values.SERVICE_NAME }}
   name: {{ .Values.SERVICE_NAME }}
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       app: {{ .Values.SERVICE_NAME }}
@@ -35,4 +35,8 @@ spec:
           value: {{ .Values.COUCHBASE_USERNAME }}
         - name: "COUCHBASE_BUCKET"
           value: {{ .Values.COUCHBASE_BUCKET }}
+        - name : "SERVICE_NAME"
+          value: {{ .Values.SERVICE_NAME }}
+        - name : "SERVICE_VERSION"
+          value: {{ .Values.SERVICE_VERSION }}
 {{end}}

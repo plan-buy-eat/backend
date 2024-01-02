@@ -2,15 +2,16 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	_ "github.com/joho/godotenv/autoload"
 	"github.com/rs/zerolog"
 	"github.com/shoppinglist/log"
+	"github.com/shoppinglist/models"
+	"strconv"
 
 	"github.com/shoppinglist/db"
-	"github.com/shoppinglist/models"
 	"github.com/shoppinglist/utils/config"
 	"net/http"
 	"os"
@@ -19,6 +20,8 @@ import (
 )
 
 var serviceName string
+var hostName string
+var serviceVersion string
 
 func CORS(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -39,25 +42,78 @@ func CORS(next http.HandlerFunc) http.HandlerFunc {
 
 func main() {
 	serviceName = os.Getenv("SERVICE_NAME")
+	hostName = os.Getenv("HOSTNAME")
+	serviceVersion = os.Getenv("SERVICE_VERSION")
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	log.Logger().Info().Any("env", os.Environ()).Msgf("Env")
 
 	http.HandleFunc("/", CORS(func(w http.ResponseWriter, r *http.Request) {
-		log.Logger().Info().Msgf("HTTP %s %s%s\n", r.Method, r.Host, r.URL)
+		ctx := r.Context()
 
+		var out []byte
 		if r.URL.Path == "/items" && r.Method == "GET" {
 			w.Header().Set("Content-Type", "application/json")
-			w.Header().Set("X-Total-Count", "10")
-			_, err := w.Write([]byte("[{\"id\":1,\"name\":\"test\"}]"))
+
+			itemsDB, err := db.NewDB(ctx)
+			if err != nil {
+				log.Logger().Err(err).Msg("Error searching for items")
+				http.Error(w, "Server Error", http.StatusInternalServerError)
+				return
+			}
+
+			id := r.URL.Query().Get("id")
+			if id != "" {
+				itemOut, err := itemsDB.GetItem(ctx, id)
+				if err != nil {
+					log.Logger().Err(err).Msg("Error searching for items")
+					http.Error(w, "Server Error", http.StatusInternalServerError)
+					return
+				}
+				out, err = json.Marshal(itemOut)
+				if err != nil {
+					log.Logger().Err(err).Msg("Error marshaling items")
+					http.Error(w, "Server Error", http.StatusInternalServerError)
+					return
+				}
+			}
+
+			var itemsOut []*models.ItemWithId
+			q := r.URL.Query().Get("q")
+			if q != "" {
+				itemsOut, err = itemsDB.SearchItems(ctx, "title-index", q)
+				if err != nil {
+					log.Logger().Err(err).Msg("Error searching items")
+					http.Error(w, "Server Error", http.StatusInternalServerError)
+				}
+				out, err = json.Marshal(itemsOut)
+				if err != nil {
+					log.Logger().Err(err).Msg("Error marshaling items")
+					http.Error(w, "Server Error", http.StatusInternalServerError)
+				}
+			} else {
+				itemsOut, err = itemsDB.GetItems(ctx)
+				if err != nil {
+					log.Logger().Err(err).Msg("Error getting items")
+					http.Error(w, "Server Error", http.StatusInternalServerError)
+				}
+				out, err = json.Marshal(itemsOut)
+				if err != nil {
+					log.Logger().Err(err).Msg("Error marshaling items")
+					http.Error(w, "Server Error", http.StatusInternalServerError)
+				}
+			}
+			w.Header().Set("X-Total-Count", strconv.Itoa(len(itemsOut)))
+
+			_, err = w.Write(out)
 			if err != nil {
 				log.Logger().Err(err).Msg("Error writing response")
 				http.Error(w, "Server Error", http.StatusInternalServerError)
 				return
 			}
 		} else if r.URL.Path == "/init" && r.Method == "GET" {
-			err := initDB()
+			err := db.InitDB(ctx)
 			if err != nil {
-				log.Logger().Err(err).Msg("Error in init")
+				log.Logger().Err(err).Msg("Error searching for items")
 				http.Error(w, "Server Error", http.StatusInternalServerError)
 				return
 			}
@@ -70,7 +126,7 @@ func main() {
 			}
 		} else if r.URL.Path == "/healthz" && r.Method == "GET" {
 			w.Header().Set("Content-Type", "text/plain")
-			t := fmt.Sprintf("%s: %s\n", serviceName, time.Now().Local().Format(time.RFC1123Z))
+			t := fmt.Sprintf("%s(%s)@%s: %s\n", serviceName, hostName, serviceVersion, time.Now().Local().Format(time.RFC1123Z))
 			log.Logger().Printf("response %s\n", t)
 			_, err := w.Write([]byte(t + "\n"))
 			if err != nil {
@@ -110,60 +166,4 @@ func main() {
 	<-idleConnectionsClosed
 
 	log.Logger().Printf("Bye bye")
-}
-
-func initDB() (err error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
-
-	itemsDB, err := db.NewDB(ctx)
-	if err != nil {
-		log.Logger().Error().Err(err)
-		return
-	}
-	item1 := &models.Item{
-		Title:  "Cottage Cheese",
-		Amount: 1,
-		Unit:   "pc",
-		Bought: false,
-	}
-	item2 := &models.Item{
-		Title:  "Avocado",
-		Amount: 2,
-		Unit:   "pc",
-		Bought: true,
-	}
-
-	itemId1, err := itemsDB.UpsertItem(ctx, db.Key("item", item1.Title), item1)
-	if err != nil {
-		log.Logger().Error().Err(err)
-		return err
-	}
-	_, err = itemsDB.UpsertItem(ctx, db.Key("item", item2.Title), item2)
-	if err != nil {
-		log.Logger().Error().Err(err)
-		return err
-	}
-
-	item1out, err := itemsDB.GetItem(ctx, itemId1)
-	if err != nil {
-		log.Logger().Error().Err(err)
-		return err
-	}
-	spew.Dump(item1out)
-
-	itemsOut, err := itemsDB.GetAllItems(ctx)
-	if err != nil {
-		log.Logger().Error().Err(err)
-		return err
-	}
-	spew.Dump(itemsOut)
-
-	itemSearchResults, err := itemsDB.SearchItems(ctx, "title-index", "Avocado")
-	if err != nil {
-		log.Logger().Error().Err(err)
-		return err
-	}
-	spew.Dump(itemSearchResults)
-	return
 }

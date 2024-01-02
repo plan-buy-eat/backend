@@ -1,4 +1,4 @@
-SERVICE_VERSION = 0.0.10
+SERVICE_VERSION = 0.0.11
 
 all:
 	$(eval GIT_BRANCH=$(shell git rev-parse --abbrev-ref HEAD))
@@ -135,10 +135,27 @@ install-monitoring:
 uninstall-monitoring:
 	helm uninstall kube-prometheus-stack --namespace monitoring
 
+.PHONY: expose-prometheus
+expose-prometheus:
+	kubectl --namespace monitoring port-forward svc/kube-prometheus-stack 9090
+	# Then access via http://localhost:9090
+
+.PHONY: expose-grafana
+expose-grafana:
+	kubectl --namespace monitoring port-forward svc/kube-prometheus-stack-grafana 3000:80
+	# Then access via http://localhost:3000
+
+.PHONY: expose-alertmanager
+expose-alertmanager:
+	kubectl --namespace monitoring port-forward svc/alertmanager-main 9093
+	# Then access via http://localhost:9093
+
+#==================================================================================================
+
 .PHONY: install-traefik
 install-traefik:
 	helm repo add traefik https://traefik.github.io/charts
-	helm install traefik traefik/traefik
+	helm install traefik traefik/traefik --values devops/k8s/traefik/values.yaml
 
 .PHONY: uninstall-traefik
 uninstall-traefik:
@@ -149,6 +166,7 @@ expose-traefik-dashboard:
 	kubectl port-forward $(kubectl get pods --selector "app.kubernetes.io/name=traefik" --output=name) 9000:9000
 
 #==================================================================================================
+
 .PHONY: install-couchbase-local
 install-couchbase-local:
 	docker run -d --name couchbase -p 8091-8094:8091-8094 -p 11210:11210 couchbase
@@ -168,6 +186,16 @@ uninstall-couchbase:
 .PHONY: status-couchbase
 status-couchbase:
 	helm status couchbase --namespace couchbase
+
+.PHONY: expose-couchbase-ui
+expose-couchbase-ui:
+	kubectl port-forward --namespace couchbase couchbase-0000 38091:8091
+
+.PHONY: expose-couchbase-api
+expose-couchbase-api:
+	kubectl port-forward --namespace couchbase couchbase-0000 38094:8094
+
+#==================================================================================================
 
 .PHONY: install-test-service
 install-test-service:

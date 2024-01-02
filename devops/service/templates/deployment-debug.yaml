@@ -25,4 +25,20 @@ spec:
         imagePullPolicy: Always
         ports:
           - containerPort: 80
+        env:
+          - name: "COUCHBASE_PASSWORD"
+            valueFrom:
+              secretKeyRef:
+                key:  COUCHBASE_PASSWORD
+                name: {{ .Release.Name }}-{{ .Values.SERVICE_NAME }}-db
+          - name: "COUCHBASE_CONNECTION_STRING"
+            value: {{ .Values.COUCHBASE_CONNECTION_STRING }}
+          - name: "COUCHBASE_USERNAME"
+            value: {{ .Values.COUCHBASE_USERNAME }}
+          - name: "COUCHBASE_BUCKET"
+            value: {{ .Values.COUCHBASE_BUCKET }}
+          - name : "SERVICE_NAME"
+            value: {{ .Values.SERVICE_NAME }}
+          - name : "SERVICE_VERSION"
+            value: {{ .Values.SERVICE_VERSION }}
 {{end}}
