@@ -31,24 +31,27 @@ type db struct {
 	searchIndexManager *gocb.SearchIndexManager
 	bucket             *gocb.Bucket
 	scope              *gocb.Scope
-	itemsCollection    *gocb.Collection
-	itemsIndexManager  *gocb.CollectionQueryIndexManager
+	collection         *gocb.Collection
+	indexManager       *gocb.CollectionQueryIndexManager
+	fields             []string
 }
 
-var instance *db
-var mu sync.Mutex
+var items *db
+var muItems sync.Mutex
 
-func NewDB(ctx context.Context) (DB, error) {
-	mu.Lock()
-	defer mu.Unlock()
+func NewItemsDB(ctx context.Context) (DB, error) {
+	muItems.Lock()
+	defer muItems.Unlock()
 
-	if instance != nil {
-		return instance, nil
+	if items != nil {
+		return items, nil
 	}
 	// Uncomment following line to enable logging
 	//gocb.SetLogger(gocb.VerboseStdioLogger())
 
-	instance = &db{}
+	items = &db{
+		fields: []string{"title", "amount", "unit", "bought", "shop"},
+	}
 	var err error
 
 	connectionString := os.Getenv("COUCHBASE_CONNECTION_STRING")
@@ -56,7 +59,7 @@ func NewDB(ctx context.Context) (DB, error) {
 	username := os.Getenv("COUCHBASE_USERNAME")
 	password := os.Getenv("COUCHBASE_PASSWORD")
 
-	instance.cluster, err = gocb.Connect(connectionString, gocb.ClusterOptions{
+	items.cluster, err = gocb.Connect(connectionString, gocb.ClusterOptions{
 		Authenticator: gocb.PasswordAuthenticator{
 			Username: username,
 			Password: password,
@@ -67,11 +70,11 @@ func NewDB(ctx context.Context) (DB, error) {
 		return nil, err
 	}
 
-	instance.searchIndexManager = instance.cluster.SearchIndexes()
+	items.searchIndexManager = items.cluster.SearchIndexes()
 
-	instance.bucket = instance.cluster.Bucket(bucketName)
+	items.bucket = items.cluster.Bucket(bucketName)
 
-	err = instance.bucket.WaitUntilReady(5*time.Second, &gocb.WaitUntilReadyOptions{
+	err = items.bucket.WaitUntilReady(5*time.Second, &gocb.WaitUntilReadyOptions{
 		Context: ctx,
 	})
 	if err != nil {
@@ -79,9 +82,9 @@ func NewDB(ctx context.Context) (DB, error) {
 		return nil, err
 	}
 
-	instance.collectionManager = instance.bucket.Collections()
+	items.collectionManager = items.bucket.Collections()
 
-	err = instance.collectionManager.CreateScope("0",
+	err = items.collectionManager.CreateScope("0",
 		&gocb.CreateScopeOptions{Context: ctx})
 	if err != nil {
 		if !errors.Is(err, gocb.ErrScopeExists) {
@@ -89,8 +92,8 @@ func NewDB(ctx context.Context) (DB, error) {
 			return nil, err
 		}
 	}
-	instance.scope = instance.bucket.Scope("0")
-	err = instance.collectionManager.CreateCollection(gocb.CollectionSpec{
+	items.scope = items.bucket.Scope("0")
+	err = items.collectionManager.CreateCollection(gocb.CollectionSpec{
 		Name:      "items",
 		ScopeName: "0",
 	}, &gocb.CreateCollectionOptions{
@@ -102,11 +105,11 @@ func NewDB(ctx context.Context) (DB, error) {
 			return nil, err
 		}
 	}
-	instance.itemsCollection = instance.scope.Collection("items")
+	items.collection = items.scope.Collection("items")
 
-	instance.itemsIndexManager = instance.itemsCollection.QueryIndexes()
+	items.indexManager = items.collection.QueryIndexes()
 
-	if err = instance.itemsIndexManager.CreatePrimaryIndex(&gocb.CreatePrimaryQueryIndexOptions{
+	if err = items.indexManager.CreatePrimaryIndex(&gocb.CreatePrimaryQueryIndexOptions{
 		IgnoreIfExists: false,
 		Deferred:       false,
 		Context:        ctx,
@@ -117,8 +120,8 @@ func NewDB(ctx context.Context) (DB, error) {
 		}
 	}
 
-	for _, fieldName := range []string{"created", "updated", "title", "amount", "unit", "bought", "shop"} {
-		if err := instance.itemsIndexManager.CreateIndex("ix_"+fieldName, []string{fieldName},
+	for _, fieldName := range items.fields {
+		if err := items.indexManager.CreateIndex("ix_"+fieldName, []string{fieldName},
 			&gocb.CreateQueryIndexOptions{
 				IgnoreIfExists: false,
 				Deferred:       false,
@@ -148,7 +151,7 @@ func NewDB(ctx context.Context) (DB, error) {
 	//	}
 	//}
 
-	return instance, nil
+	return items, nil
 }
 
 func (d *db) UpsertItem(ctx context.Context, inId string, item *models.Item) (outId string, err error) {
@@ -161,7 +164,7 @@ func (d *db) UpsertItem(ctx context.Context, inId string, item *models.Item) (ou
 		Updated: time.Now().UTC().UnixMilli(),
 	}
 
-	_, err = d.itemsCollection.Upsert(outId, item,
+	_, err = d.collection.Upsert(outId, item,
 		&gocb.UpsertOptions{Context: ctx})
 	if err != nil {
 		log.Logger().Err(err)
@@ -176,7 +179,7 @@ func Key(prefix string, id string) string {
 	return fmt.Sprintf("%s:%s", prefix, id)
 }
 func (d *db) GetItem(ctx context.Context, id string) (item *models.Item, err error) {
-	getResult, err := d.itemsCollection.Get(id,
+	getResult, err := d.collection.Get(id,
 		&gocb.GetOptions{Context: ctx})
 	if err != nil {
 		log.Logger().Err(err)
@@ -233,7 +236,7 @@ func (d *db) SearchItems(ctx context.Context, index string, query string) (items
 		),
 		&gocb.SearchOptions{
 			Limit:   1000,
-			Fields:  []string{"title", "amount", "unit", "bought", "shop"},
+			Fields:  d.fields,
 			Context: ctx,
 		},
 	)
@@ -284,7 +287,7 @@ func (d *db) SearchItems(ctx context.Context, index string, query string) (items
 }
 
 func (d *db) DeleteItem(ctx context.Context, id string) (err error) {
-	_, err = d.itemsCollection.Remove(id,
+	_, err = d.collection.Remove(id,
 		&gocb.RemoveOptions{Context: ctx})
 	if err != nil {
 		log.Logger().Err(err)
@@ -329,7 +332,7 @@ func InitDB(ctx context.Context) (err error) {
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
-	itemsDB, err := NewDB(ctx)
+	itemsDB, err := NewItemsDB(ctx)
 	if err != nil {
 		log.Logger().Error().Err(err)
 		return

@@ -34,7 +34,7 @@ func New() Handler {
 func (h *handler) HealthZ(c *gin.Context) {
 	ctx := c.Request.Context()
 	c.Header("Content-Type", "text/plain")
-	itemsDB, err := db.NewDB(ctx)
+	itemsDB, err := db.NewItemsDB(ctx)
 	if err != nil {
 		h.err(c, "getting db", err)
 		return
@@ -71,7 +71,7 @@ func (h *handler) GetItem(c *gin.Context) {
 	if id == "" {
 		h.errWithStatus(c, http.StatusBadRequest, "bad request", fmt.Errorf("no id specified"))
 	}
-	itemsDB, err := db.NewDB(ctx)
+	itemsDB, err := db.NewItemsDB(ctx)
 	if err != nil {
 		h.err(c, "getting db", err)
 		return
@@ -89,7 +89,7 @@ func (h *handler) GetItems(c *gin.Context) {
 	ctx := c.Request.Context()
 	c.Header("Content-Type", "application/json")
 
-	itemsDB, err := db.NewDB(ctx)
+	itemsDB, err := db.NewItemsDB(ctx)
 	if err != nil {
 		h.err(c, "getting db", err)
 		return
