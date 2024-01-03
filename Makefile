@@ -219,7 +219,8 @@ lint:
 	docker run \
       -e RUN_LOCAL=true \
       -e VALIDATE_GO=false \
-      -e "FILTER_REGEX_EXCLUDE=.*(?:sandbox|couchbase-operator).*" \
+      -e IGNORE_GITIGNORED_FILES=true \
+      -e "FILTER_REGEX_EXCLUDE=.*(sandbox|couchbase-operator|templates).*" \
       -v .:/tmp/lint \
       --rm \
       --platform linux/amd64 \

@@ -2,7 +2,8 @@ FROM golang:1.21 AS build-stage
 
 WORKDIR /usr/src/app
 
-RUN --mount=type=cache,mode=0755,target=/go/pkg/mod- CGO_ENABLED=0 go install github.com/go-delve/delve/cmd/dlv@latest
+RUN go install github.com/go-delve/delve/cmd/dlv@latest
+# --mount=type=cache,mode=0755,target=/go/pkg/mod- CGO_ENABLED=0
 
 # pre-copy/cache go.mod for pre-downloading dependencies and only redownloading them in subsequent builds if they change
 COPY ../../go.mod ../../go.sum ./

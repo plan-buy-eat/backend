@@ -56,3 +56,7 @@ jobs:
           VALIDATE_ALL_CODEBASE: false
           DEFAULT_BRANCH: master
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VALIDATE_GO: false
+          IGNORE_GITIGNORED_FILES: true
+          FILTER_REGEX_EXCLUDE: ".*(sandbox|couchbase-operator|templates).*"
+          BASH_SEVERITY: "error"

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	_ "github.com/joho/godotenv/autoload"
 	"github.com/shoppinglist/config"
@@ -14,22 +15,6 @@ import (
 	"syscall"
 	"time"
 )
-
-func CORSMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT")
-
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
-			return
-		}
-
-		c.Next()
-	}
-}
 
 func ErrorHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -49,16 +34,26 @@ func main() {
 	log.Logger().Info().Any("env", os.Environ()).Msgf("Env")
 
 	port := config.Get().Port
-	listenAddress := ":" + port
+	listenAddress := "0.0.0.0:" + port
 	log.Logger().Printf("Listening at %s", listenAddress)
 
 	router := gin.Default()
-	router.Use(CORSMiddleware())
+	router.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost", "http://localhost:5173", "https://shoppinglist.turevskiy.kharkiv.ua"},
+		AllowMethods:     []string{"*"},
+		AllowHeaders:     []string{"*"},
+		ExposeHeaders:    []string{"Content-Length", "Content-Type", "X-Total-Count"},
+		AllowCredentials: true,
+		//AllowOriginFunc: func(origin string) bool {
+		//	return origin == "https://github.com"
+		//},
+		MaxAge: 12 * time.Hour,
+	}))
 	router.Use(ErrorHandler())
 
 	h := handler.New()
 	items := router.Group("/items")
-	items.GET("/", h.GetItems)
+	items.GET("", h.GetItems)
 	items.GET("/:id", h.GetItem)
 	router.GET("/init", h.Init)
 	router.GET("/healthz", h.HealthZ)
