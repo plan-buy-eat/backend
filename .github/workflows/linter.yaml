@@ -62,4 +62,4 @@ jobs:
           BASH_SEVERITY: "error"
           VALIDATE_NATURAL_LANGUAGE: false
           VALIDATE_DOCKERFILE_HADOLINT: false
-          VALIDATE_DOTENV_LINTER: false
+          VALIDATE_ENV: false

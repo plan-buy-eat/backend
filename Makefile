@@ -224,7 +224,7 @@ lint:
 	  -e BASH_SEVERITY=error \
       -e VALIDATE_NATURAL_LANGUAGE=false \
       -e VALIDATE_DOCKERFILE_HADOLINT=false \
-      -e VALIDATE_DOTENV_LINTER=false \
+      -e VALIDATE_ENV=false \
       -v .:/tmp/lint \
       --rm \
       --platform linux/amd64 \
