@@ -16,7 +16,6 @@ RUN --mount=type=cache,mode=0755,target=/go/pkg/mod CGO_ENABLED=0 go build -v -o
 #RUN go test -v ./...
 
 FROM alpine:latest AS build-release-stage
-FROM ubuntu:latest AS build-release-stage
 
 WORKDIR /
 

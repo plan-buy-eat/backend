@@ -220,9 +220,9 @@ lint:
       -e RUN_LOCAL=true \
       -e VALIDATE_GO=false \
       -e IGNORE_GITIGNORED_FILES=true \
-      -e "FILTER_REGEX_EXCLUDE=.*(sandbox|couchbase-operator|templates).*" \
+      -e "FILTER_REGEX_EXCLUDE=.*(sandbox|couchbase|templates).*" \
       -v .:/tmp/lint \
       --rm \
       --platform linux/amd64 \
-      ghcr.io/super-linter/super-linter:latest
+      ghcr.io/super-linter/super-linter/slim:latest
 #            -e ACTIONS_RUNNER_DEBUG=true \
