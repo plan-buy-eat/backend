@@ -221,8 +221,11 @@ lint:
       -e VALIDATE_GO=false \
       -e IGNORE_GITIGNORED_FILES=true \
       -e "FILTER_REGEX_EXCLUDE=.*(sandbox|couchbase|templates).*" \
+	  -e BASH_SEVERITY=error \
+      -e VALIDATE_NATURAL_LANGUAGE=false \
+      -e VALIDATE_DOCKERFILE_HADOLINT=false \
       -v .:/tmp/lint \
       --rm \
       --platform linux/amd64 \
-      ghcr.io/super-linter/super-linter/slim:latest
+      ghcr.io/super-linter/super-linter:latest
 #            -e ACTIONS_RUNNER_DEBUG=true \

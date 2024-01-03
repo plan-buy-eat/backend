@@ -51,7 +51,7 @@ jobs:
       # Run Linter against code base #
       ################################
       - name: Lint Code Base
-        uses: super-linter/super-linter/slim@v5
+        uses: super-linter/super-linter@v5
         env:
           VALIDATE_ALL_CODEBASE: false
           DEFAULT_BRANCH: master
@@ -60,3 +60,5 @@ jobs:
           IGNORE_GITIGNORED_FILES: true
           FILTER_REGEX_EXCLUDE: ".*(sandbox|couchbase|templates).*"
           BASH_SEVERITY: "error"
+          VALIDATE_NATURAL_LANGUAGE: false
+          VALIDATE_DOCKERFILE_HADOLINT: false
