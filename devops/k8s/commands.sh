@@ -1,3 +1,5 @@
+#!/bin/sh
+
 # https://www.linuxtechi.com/install-kubernetes-on-ubuntu-22-04/#8_Install_Calico_Network_Plugin
 
 sudo hostnamectl set-hostname "k8smaster.cluster-prod.turevskiy.kharkiv.ua"

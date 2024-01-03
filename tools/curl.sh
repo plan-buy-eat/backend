@@ -1,3 +1,4 @@
+#!/bin/sh
 curl -XPUT -H "Content-Type: application/json" \
 -u XXXXXXXX:XXXXXXX http://localhost:8094/api/index/title-index -d \
 '{

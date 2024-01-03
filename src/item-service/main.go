@@ -2,168 +2,98 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"fmt"
+	"github.com/gin-gonic/gin"
 	_ "github.com/joho/godotenv/autoload"
-	"github.com/rs/zerolog"
+	"github.com/shoppinglist/config"
+	"github.com/shoppinglist/item-service/handler"
 	"github.com/shoppinglist/log"
-	"github.com/shoppinglist/models"
-	"strconv"
-
-	"github.com/shoppinglist/db"
-	"github.com/shoppinglist/utils/config"
 	"net/http"
 	"os"
 	"os/signal"
+	"syscall"
 	"time"
 )
 
-var serviceName string
-var hostName string
-var serviceVersion string
+func CORSMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT")
 
-func CORS(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Add("Access-Control-Allow-Origin", "*")
-		w.Header().Add("Access-Control-Allow-Credentials", "true")
-		w.Header().Add("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
-		w.Header().Add("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
-		w.Header().Add("Access-Control-Expose-Headers", "X-Total-Count")
-
-		if r.Method == "OPTIONS" {
-			http.Error(w, "No Content", http.StatusNoContent)
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
 			return
 		}
 
-		next(w, r)
+		c.Next()
+	}
+}
+
+func ErrorHandler() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Status(http.StatusOK)
+		c.Next()
+		for _, err := range c.Errors {
+			log.Logger().Err(err).Msg("Error getting db")
+		}
+		if len(c.Errors) > 0 && c.Writer.Status() == http.StatusOK {
+			c.JSON(http.StatusInternalServerError, "Internal Server Error")
+		}
 	}
 }
 
 func main() {
-	serviceName = os.Getenv("SERVICE_NAME")
-	hostName = os.Getenv("HOSTNAME")
-	serviceVersion = os.Getenv("SERVICE_VERSION")
-	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+	//zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	log.Logger().Info().Any("env", os.Environ()).Msgf("Env")
 
-	http.HandleFunc("/", CORS(func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-
-		var out []byte
-		if r.URL.Path == "/items" && r.Method == "GET" {
-			w.Header().Set("Content-Type", "application/json")
-
-			itemsDB, err := db.NewDB(ctx)
-			if err != nil {
-				log.Logger().Err(err).Msg("Error searching for items")
-				http.Error(w, "Server Error", http.StatusInternalServerError)
-				return
-			}
-
-			id := r.URL.Query().Get("id")
-			if id != "" {
-				itemOut, err := itemsDB.GetItem(ctx, id)
-				if err != nil {
-					log.Logger().Err(err).Msg("Error searching for items")
-					http.Error(w, "Server Error", http.StatusInternalServerError)
-					return
-				}
-				out, err = json.Marshal(itemOut)
-				if err != nil {
-					log.Logger().Err(err).Msg("Error marshaling items")
-					http.Error(w, "Server Error", http.StatusInternalServerError)
-					return
-				}
-			}
-
-			var itemsOut []*models.ItemWithId
-			q := r.URL.Query().Get("q")
-			if q != "" {
-				itemsOut, err = itemsDB.SearchItems(ctx, "title-index", q)
-				if err != nil {
-					log.Logger().Err(err).Msg("Error searching items")
-					http.Error(w, "Server Error", http.StatusInternalServerError)
-				}
-				out, err = json.Marshal(itemsOut)
-				if err != nil {
-					log.Logger().Err(err).Msg("Error marshaling items")
-					http.Error(w, "Server Error", http.StatusInternalServerError)
-				}
-			} else {
-				itemsOut, err = itemsDB.GetItems(ctx)
-				if err != nil {
-					log.Logger().Err(err).Msg("Error getting items")
-					http.Error(w, "Server Error", http.StatusInternalServerError)
-				}
-				out, err = json.Marshal(itemsOut)
-				if err != nil {
-					log.Logger().Err(err).Msg("Error marshaling items")
-					http.Error(w, "Server Error", http.StatusInternalServerError)
-				}
-			}
-			w.Header().Set("X-Total-Count", strconv.Itoa(len(itemsOut)))
-
-			_, err = w.Write(out)
-			if err != nil {
-				log.Logger().Err(err).Msg("Error writing response")
-				http.Error(w, "Server Error", http.StatusInternalServerError)
-				return
-			}
-		} else if r.URL.Path == "/init" && r.Method == "GET" {
-			err := db.InitDB(ctx)
-			if err != nil {
-				log.Logger().Err(err).Msg("Error searching for items")
-				http.Error(w, "Server Error", http.StatusInternalServerError)
-				return
-			}
-			w.Header().Set("Content-Type", "text/plain")
-			_, err = w.Write([]byte("OK\n"))
-			if err != nil {
-				log.Logger().Err(err).Msg("Error writing response")
-				http.Error(w, "Server Error", http.StatusInternalServerError)
-				return
-			}
-		} else if r.URL.Path == "/healthz" && r.Method == "GET" {
-			w.Header().Set("Content-Type", "text/plain")
-			t := fmt.Sprintf("%s(%s)@%s: %s\n", serviceName, hostName, serviceVersion, time.Now().Local().Format(time.RFC1123Z))
-			log.Logger().Printf("response %s\n", t)
-			_, err := w.Write([]byte(t + "\n"))
-			if err != nil {
-				log.Logger().Err(err).Msg("Error writing response")
-				http.Error(w, "Server Error", http.StatusInternalServerError)
-				return
-			}
-		} else {
-			http.Error(w, "Not Found", http.StatusNotFound)
-			return
-		}
-	}))
-
-	port := config.GetValue("PORT", "80")
+	port := config.Get().Port
 	listenAddress := ":" + port
 	log.Logger().Printf("Listening at %s", listenAddress)
 
-	httpServer := http.Server{
-		Addr: listenAddress,
+	router := gin.Default()
+	router.Use(CORSMiddleware())
+	router.Use(ErrorHandler())
+
+	h := handler.New()
+	items := router.Group("/items")
+	items.GET("/", h.GetItems)
+	items.GET("/:id", h.GetItem)
+	router.GET("/init", h.Init)
+	router.GET("/healthz", h.HealthZ)
+
+	srv := &http.Server{
+		Addr:    listenAddress,
+		Handler: router,
 	}
 
-	idleConnectionsClosed := make(chan struct{})
 	go func() {
-		sigint := make(chan os.Signal, 1)
-		signal.Notify(sigint, os.Interrupt)
-		<-sigint
-		if err := httpServer.Shutdown(context.Background()); err != nil {
-			log.Logger().Printf("HTTP Server Shutdown Error: %v", err)
+		// service connections
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Logger().Fatal().Err(err).Msg("listen\n")
 		}
-		close(idleConnectionsClosed)
 	}()
 
-	if err := httpServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-		log.Logger().Fatal().Msgf("HTTP server ListenAndServe Error: %v", err)
+	// Wait for interrupt signal to gracefully shutdown the server with
+	// a timeout of 5 seconds.
+	quit := make(chan os.Signal)
+	// kill (no param) default send syscanll.SIGTERM
+	// kill -2 is syscall.SIGINT
+	// kill -9 is syscall. SIGKILL but can"t be catch, so don't need add it
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	log.Logger().Info().Msg("Shutdown Server ...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Logger().Fatal().Err(err).Msg("Server Shutdown")
 	}
-
-	<-idleConnectionsClosed
-
-	log.Logger().Printf("Bye bye")
+	// catching ctx.Done(). timeout of 5 seconds.
+	select {
+	case <-ctx.Done():
+		log.Logger().Info().Msg("timeout of 5 seconds.")
+	}
+	log.Logger().Info().Msg("Server exiting")
 }

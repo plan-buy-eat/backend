@@ -212,3 +212,16 @@ install-ingress-example:
 .PHONY: uninstall-ingress-example
 uninstall-ingress-example:
 	helm uninstall ingress-example
+
+#==================================================================================================
+.PHONY: lint
+lint:
+	docker run \
+      -e RUN_LOCAL=true \
+      -e VALIDATE_GO=false \
+      -e "FILTER_REGEX_EXCLUDE=.*(?:sandbox|couchbase-operator).*" \
+      -v .:/tmp/lint \
+      --rm \
+      --platform linux/amd64 \
+      ghcr.io/super-linter/super-linter:latest
+#            -e ACTIONS_RUNNER_DEBUG=true \

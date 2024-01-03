@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/couchbase/gocb/v2"
@@ -21,7 +22,7 @@ type DB interface {
 	GetItem(ctx context.Context, id string) (item *models.Item, err error)
 	GetItems(ctx context.Context) (items []*models.ItemWithId, err error)
 	SearchItems(ctx context.Context, index string, query string) (items []*models.ItemWithId, err error)
-	DeleteItem(ctx context.Context, id string) (err error)
+	Ping(ctx context.Context) (report string, err error)
 }
 
 type db struct {
@@ -47,7 +48,7 @@ func NewDB(ctx context.Context) (DB, error) {
 	// Uncomment following line to enable logging
 	//gocb.SetLogger(gocb.VerboseStdioLogger())
 
-	instance := &db{}
+	instance = &db{}
 	var err error
 
 	connectionString := os.Getenv("COUCHBASE_CONNECTION_STRING")
@@ -291,6 +292,37 @@ func (d *db) DeleteItem(ctx context.Context, id string) (err error) {
 	}
 	log.Logger().Info().Msgf("Item deleted: %s\n", id)
 	return
+}
+
+func (d *db) Ping(ctx context.Context) (report string, err error) {
+	pings, err := d.bucket.Ping(&gocb.PingOptions{
+		ReportID:     "ping",
+		ServiceTypes: []gocb.ServiceType{gocb.ServiceTypeKeyValue},
+		Context:      ctx,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	b, err := json.Marshal(pings)
+	if err != nil {
+		return "", err
+	}
+
+	for service, pingReports := range pings.Services {
+		if service != gocb.ServiceTypeKeyValue {
+			err = fmt.Errorf("we got a service type that we didn't ask for")
+			return "", err
+		}
+
+		for _, pingReport := range pingReports {
+			if pingReport.State != gocb.PingStateOk {
+				err = fmt.Errorf("we got a service state that is not OK")
+			}
+		}
+	}
+
+	return string(b), err
 }
 
 func InitDB(ctx context.Context) (err error) {

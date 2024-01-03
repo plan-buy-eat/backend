@@ -63,4 +63,5 @@ devops/k8s/
 
 .DS_Store
 
-
+core.*
+*.core
