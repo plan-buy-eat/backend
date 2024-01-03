@@ -3,13 +3,13 @@ package models
 type Item struct {
 	Base
 	Title  string  `json:"title"`
-	Amount float64 `json:"amount,default=1"`
-	Unit   string  `json:"unit,default=pc"`
-	Bought bool    `json:"bought,default=false"`
-	Shop   string  `json:"shop,default=Edeka"`
+	Amount float64 `json:"amount"`
+	Unit   string  `json:"unit"`
+	Bought bool    `json:"bought"`
+	Shop   string  `json:"shop"`
 }
 
-type ItemWithId struct {
+type ItemWithID struct {
 	Item
 	ID string `json:"id"`
 }

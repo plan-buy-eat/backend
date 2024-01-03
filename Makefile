@@ -216,11 +216,11 @@ uninstall-ingress-example:
 #==================================================================================================
 .PHONY: lint
 lint:
+	$(eval FILTER_REGEX_EXCLUDE=".*(sandbox|couchbase|templates).*")
 	docker run \
       -e RUN_LOCAL=true \
       -e VALIDATE_GO=false \
       -e IGNORE_GITIGNORED_FILES=true \
-      -e "FILTER_REGEX_EXCLUDE=.*(sandbox|couchbase|templates).*" \
 	  -e BASH_SEVERITY=error \
       -e VALIDATE_NATURAL_LANGUAGE=false \
       -e VALIDATE_DOCKERFILE_HADOLINT=false \

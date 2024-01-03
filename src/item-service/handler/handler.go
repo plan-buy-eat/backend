@@ -85,31 +85,51 @@ func (h *handler) GetItem(c *gin.Context) {
 	h.res(c, itemOut)
 }
 
+type PaginationQuery struct {
+	Start int    `form:"_start"`
+	End   int    `form:"_end"`
+	Sort  string `form:"_sort"`
+	Order string `form:"_order"`
+	Query string `form:"q"`
+}
+
 func (h *handler) GetItems(c *gin.Context) {
 	ctx := c.Request.Context()
-	c.Header("Content-Type", "application/json")
 
+	var p PaginationQuery
+	if err := c.ShouldBindQuery(&p); err != nil {
+		h.err(c, "parsing parameters", err)
+		return
+	}
+
+	c.Header("Content-Type", "application/json")
 	itemsDB, err := db.NewItemsDB(ctx)
 	if err != nil {
 		h.err(c, "getting db", err)
 		return
 	}
 
-	var itemsOut []*models.ItemWithId
-	q := c.Request.URL.Query().Get("q")
-	if q != "" {
-		itemsOut, err = itemsDB.SearchItems(ctx, "title-index", q)
+	var itemsOut []*models.ItemWithID
+	var total int
+	if p.Query != "" {
+		itemsOut, err = itemsDB.SearchItems(ctx, p.Query)
 		if err != nil {
 			h.err(c, "searching items", err)
 		}
 		c.Header("X-Total-Count", strconv.Itoa(len(itemsOut)))
 		h.res(c, itemsOut)
 	} else {
-		itemsOut, err = itemsDB.GetItems(ctx)
+		itemsOut, total, err = itemsDB.GetItems(ctx, &db.PaginationQuery{
+			Start: p.Start,
+			End:   p.End,
+			Sort:  p.Sort,
+			Order: p.Order,
+			Query: p.Query,
+		})
 		if err != nil {
 			h.err(c, "getting items", err)
 		}
-		c.Header("X-Total-Count", strconv.Itoa(len(itemsOut)))
+		c.Header("X-Total-Count", strconv.Itoa(total))
 		h.res(c, itemsOut)
 	}
 

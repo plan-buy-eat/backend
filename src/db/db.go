@@ -20,8 +20,8 @@ import (
 type DB interface {
 	UpsertItem(ctx context.Context, inId string, item *models.Item) (id string, err error)
 	GetItem(ctx context.Context, id string) (item *models.Item, err error)
-	GetItems(ctx context.Context) (items []*models.ItemWithId, err error)
-	SearchItems(ctx context.Context, index string, query string) (items []*models.ItemWithId, err error)
+	GetItems(ctx context.Context, q *PaginationQuery) (items []*models.ItemWithID, total int, err error)
+	SearchItems(ctx context.Context, query string) (items []*models.ItemWithID, err error)
 	Ping(ctx context.Context) (report string, err error)
 }
 
@@ -199,19 +199,42 @@ func (d *db) GetItem(ctx context.Context, id string) (item *models.Item, err err
 	return
 }
 
-func (d *db) GetItems(ctx context.Context) (items []*models.ItemWithId, err error) {
+type PaginationQuery struct {
+	Start int
+	End   int
+	Sort  string
+	Order string
+	Query string
+}
+
+func (d *db) GetItems(ctx context.Context, q *PaginationQuery) (items []*models.ItemWithID, total int, err error) {
 	query := "SELECT meta(x).id, x.* FROM items x"
+	queryTotal := "SELECT COUNT(*) as total FROM items x"
+	if q.Order == "" {
+		q.Order = "ASC"
+	}
+	if q.Sort != "" {
+		query += fmt.Sprintf("\nORDER BY x.%s %s, meta(x).id ASC", q.Sort, q.Order)
+	} else {
+		query += fmt.Sprintf("\nORDER BY meta(x).id ASC")
+	}
+	if q.Start != 0 {
+		query += fmt.Sprintf("\nOFFSET %d ", q.Start)
+	}
+	if q.End != 0 {
+		query += fmt.Sprintf("\nLIMIT %d ", q.End-q.Start)
+	}
+
+	log.Logger().Info().Msgf("Query: %s", query)
 	params := make(map[string]interface{})
 	queryResult, err := d.scope.Query(query, &gocb.QueryOptions{Adhoc: true, Context: ctx, NamedParameters: params})
 	if err != nil {
 		log.Logger().Err(err)
 		return
 	}
-
-	items = []*models.ItemWithId{}
-	// Print each found Row
+	items = []*models.ItemWithID{}
 	for queryResult.Next() {
-		var item models.ItemWithId
+		var item models.ItemWithID
 		err = queryResult.Row(&item)
 		if err != nil {
 			log.Logger().Err(err)
@@ -219,17 +242,31 @@ func (d *db) GetItems(ctx context.Context) (items []*models.ItemWithId, err erro
 		}
 		items = append(items, &item)
 	}
-
 	if err = queryResult.Err(); err != nil {
 		log.Logger().Err(err)
 		return
 	}
+
+	paramsTotal := make(map[string]interface{})
+	queryResultTotal, err := d.scope.Query(queryTotal, &gocb.QueryOptions{Adhoc: true, Context: ctx, NamedParameters: paramsTotal})
+	if err != nil {
+		log.Logger().Err(err)
+		return
+	}
+	var totalResult models.Total
+	err = queryResultTotal.One(&totalResult)
+	if err != nil {
+		log.Logger().Err(err)
+		return
+	}
+	total = totalResult.Total
+
 	return
 }
 
-func (d *db) SearchItems(ctx context.Context, index string, query string) (items []*models.ItemWithId, err error) {
+func (d *db) SearchItems(ctx context.Context, query string) (items []*models.ItemWithID, err error) {
 	matchResult, err := d.cluster.SearchQuery(
-		index,
+		"title-index",
 		search.NewConjunctionQuery(
 			search.NewMatchQuery(query),
 			//search.NewDateRangeQuery().Start("2019-01-01", true).End("2029-02-01", false),
@@ -268,9 +305,9 @@ func (d *db) SearchItems(ctx context.Context, index string, query string) (items
 		return int(j.Score - i.Score)
 	})
 
-	items = make([]*models.ItemWithId, 0, len(itemSearchResults))
+	items = make([]*models.ItemWithID, 0, len(itemSearchResults))
 	for _, result := range itemSearchResults {
-		items = append(items, &models.ItemWithId{
+		items = append(items, &models.ItemWithID{
 			Item: models.Item{
 				Title:  result.Title,
 				Amount: result.Amount,
@@ -337,30 +374,120 @@ func InitDB(ctx context.Context) (err error) {
 		log.Logger().Error().Err(err)
 		return
 	}
-	item1 := &models.Item{
-		Title:  "Cottage Cheese",
-		Amount: 1,
-		Unit:   "pc",
-		Bought: false,
-		Shop:   "Rewe",
-	}
-	item2 := &models.Item{
-		Title:  "Avocado",
-		Amount: 2,
-		Unit:   "pc",
-		Bought: true,
-		Shop:   "Edeka",
+	items := []*models.Item{
+		{
+			Title:  "Cottage Cheese",
+			Amount: 1,
+			Unit:   "pc",
+			Bought: false,
+			Shop:   "Rewe",
+		},
+		{
+			Title:  "Avocado",
+			Amount: 2,
+			Unit:   "pc",
+			Bought: true,
+			Shop:   "Edeka",
+		},
+		{
+			Title:  "Banana",
+			Amount: 1,
+			Unit:   "pc",
+			Bought: true,
+			Shop:   "Edeka",
+		},
+		{
+			Title:  "Milk",
+			Amount: 2,
+			Unit:   "pc",
+			Bought: true,
+			Shop:   "Edeka",
+		},
+		{
+			Title:  "Bread",
+			Amount: 1,
+			Unit:   "pc",
+			Bought: true,
+			Shop:   "Edeka",
+		},
+		{
+			Title:  "Sosages",
+			Amount: 1,
+			Unit:   "pc",
+			Bought: true,
+			Shop:   "Edeka",
+		},
+		{
+			Title:  "Meat",
+			Amount: 1,
+			Unit:   "pc",
+			Bought: true,
+			Shop:   "Edeka",
+		},
+		{
+			Title:  "Creme Fraiche",
+			Amount: 1,
+			Unit:   "pc",
+			Bought: true,
+			Shop:   "Edeka",
+		},
+		{
+			Title:  "Wine",
+			Amount: 1,
+			Unit:   "pc",
+			Bought: true,
+			Shop:   "Edeka",
+		},
+		{
+			Title:  "Napkins",
+			Amount: 1,
+			Unit:   "pc",
+			Bought: true,
+			Shop:   "Edeka",
+		},
+		{
+			Title:  "Tomatoes",
+			Amount: 1,
+			Unit:   "pc",
+			Bought: true,
+			Shop:   "Edeka",
+		},
+		{
+			Title:  "Cucumber",
+			Amount: 1,
+			Unit:   "pc",
+			Bought: true,
+			Shop:   "Edeka",
+		},
+		{
+			Title:  "Ananas",
+			Amount: 1,
+			Unit:   "pc",
+			Bought: true,
+			Shop:   "Edeka",
+		},
+		{
+			Title:  "Plums",
+			Amount: 1,
+			Unit:   "pc",
+			Bought: true,
+			Shop:   "Edeka",
+		},
+		{
+			Title:  "Clementines",
+			Amount: 1,
+			Unit:   "pc",
+			Bought: true,
+			Shop:   "Edeka",
+		},
 	}
 
-	_, err = itemsDB.UpsertItem(ctx, Key("item", item1.Title), item1)
-	if err != nil {
-		log.Logger().Error().Err(err)
-		return err
-	}
-	_, err = itemsDB.UpsertItem(ctx, Key("item", item2.Title), item2)
-	if err != nil {
-		log.Logger().Error().Err(err)
-		return err
+	for _, item := range items {
+		_, err = itemsDB.UpsertItem(ctx, Key("item", item.Title), item)
+		if err != nil {
+			log.Logger().Error().Err(err)
+			return err
+		}
 	}
 
 	return
