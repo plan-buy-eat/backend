@@ -8,3 +8,7 @@ type Base struct {
 type Total struct {
 	Total int `json:"total"`
 }
+
+type ID struct {
+	ID string `json:"id"`
+}

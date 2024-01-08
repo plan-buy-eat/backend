@@ -2,12 +2,13 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	_ "github.com/joho/godotenv/autoload"
 	"github.com/shoppinglist/config"
-	"github.com/shoppinglist/item-service/handler"
+	"github.com/shoppinglist/item-service/handlers"
 	"github.com/shoppinglist/log"
 	"net/http"
 	"os"
@@ -38,8 +39,9 @@ func main() {
 	log.Logger().Printf("Listening at %s", listenAddress)
 
 	router := gin.Default()
+	router.HandleMethodNotAllowed = true
 	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost", "http://localhost:5173", "https://shoppinglist.turevskiy.kharkiv.ua"},
+		AllowOrigins:     []string{"http://localhost:5173", "https://shoppinglist.turevskiy.kharkiv.ua"},
 		AllowMethods:     []string{"*"},
 		AllowHeaders:     []string{"*"},
 		ExposeHeaders:    []string{"Content-Length", "Content-Type", "X-Total-Count"},
@@ -50,13 +52,26 @@ func main() {
 		MaxAge: 12 * time.Hour,
 	}))
 	router.Use(ErrorHandler())
+	router.NoRoute(func(c *gin.Context) {
+		c.JSON(http.StatusNotFound, "Page not found")
+	})
+	router.NoMethod(func(c *gin.Context) {
+		c.JSON(http.StatusMethodNotAllowed, "Method not found")
+	})
 
-	h := handler.New()
+	genericHandler := handlers.NewGenericHandler()
+	router.GET("/init", genericHandler.Init)
+	router.GET("/healthz", genericHandler.HealthZ)
+
+	itemHandler := handlers.NewItemHandler(sql.NullBool{
+		Bool:  false,
+		Valid: true,
+	})
+
 	items := router.Group("/items")
-	items.GET("", h.GetItems)
-	items.GET("/:id", h.GetItem)
-	router.GET("/init", h.Init)
-	router.GET("/healthz", h.HealthZ)
+	items.GET("", itemHandler.GetItems)
+	items.GET("/:id", itemHandler.GetItem)
+	items.DELETE("/:id", itemHandler.BuyItem)
 
 	srv := &http.Server{
 		Addr:    listenAddress,
