@@ -63,15 +63,23 @@ func main() {
 	router.GET("/init", genericHandler.Init)
 	router.GET("/healthz", genericHandler.HealthZ)
 
-	itemHandler := handlers.NewItemHandler(sql.NullBool{
+	toBuyHandler := handlers.NewItemHandler(sql.NullBool{
 		Bool:  false,
 		Valid: true,
 	})
+	toBuy := router.Group("/tobuy")
+	toBuy.GET("", toBuyHandler.GetItems)
+	toBuy.GET("/:id", toBuyHandler.GetItem)
+	toBuy.DELETE("/:id", toBuyHandler.BuyItem)
 
-	items := router.Group("/items")
-	items.GET("", itemHandler.GetItems)
-	items.GET("/:id", itemHandler.GetItem)
-	items.DELETE("/:id", itemHandler.BuyItem)
+	boughtHandler := handlers.NewItemHandler(sql.NullBool{
+		Bool:  true,
+		Valid: true,
+	})
+	bought := router.Group("/bought")
+	bought.GET("", boughtHandler.GetItems)
+	bought.GET("/:id", boughtHandler.GetItem)
+	bought.DELETE("/:id", boughtHandler.RestoreItem)
 
 	srv := &http.Server{
 		Addr:    listenAddress,

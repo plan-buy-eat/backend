@@ -15,6 +15,7 @@ type ItemHandler interface {
 	GetItems(c *gin.Context)
 	GetItem(c *gin.Context)
 	BuyItem(c *gin.Context)
+	RestoreItem(c *gin.Context)
 }
 
 type itemHandler struct {
