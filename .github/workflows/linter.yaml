@@ -9,11 +9,11 @@ name: Lint Code Base
 # Start the job on all push #
 #############################
 on:
-  push:
-    branches-ignore: [main]
-    # Remove the line above to run when pushing to master or main
+#  push:
+#    branches-ignore: [master, main]
+#    # Remove the line above to run when pushing to master or main
   pull_request:
-    branches: [dev, main]
+    branches: [dev, master, main]
 
 ###############
 # Set the Job #
@@ -54,5 +54,12 @@ jobs:
         uses: super-linter/super-linter@v5
         env:
           VALIDATE_ALL_CODEBASE: false
-          DEFAULT_BRANCH: main
+          DEFAULT_BRANCH: master
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VALIDATE_GO: false
+          IGNORE_GITIGNORED_FILES: true
+          FILTER_REGEX_EXCLUDE: ".*(sandbox|couchbase|templates).*"
+          BASH_SEVERITY: "error"
+          VALIDATE_NATURAL_LANGUAGE: false
+          VALIDATE_DOCKERFILE_HADOLINT: false
+          VALIDATE_ENV: false

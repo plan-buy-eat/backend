@@ -3,15 +3,15 @@ FROM golang:1.21 AS build-stage
 WORKDIR /usr/src/app
 
 # pre-copy/cache go.mod for pre-downloading dependencies and only redownloading them in subsequent builds if they change
-COPY ../../go.mod ../../go.sum ./
+COPY go.mod go.sum ./
 RUN go mod download && go mod verify
 
 COPY . .
-RUN --mount=type=cache,mode=0755,target=/go/pkg/mod GOARCH=amd64 CGO_ENABLED=0 GOOS=linux go build -v -o /usr/local/bin/app ./user-service/main.go
+RUN --mount=type=cache,mode=0755,target=/go/pkg/mod GOARCH=amd64 CGO_ENABLED=0 GOOS=linux go build -v -o /usr/local/bin/app ./item-service/main.go
 
 ## Run the tests in the container
 #FROM build-stage AS run-test-stage
-#RUN go test -v ./...
+#RUN go test -v ./src/item-service...
 
 # Deploy the application binary into a lean image
 #FROM gcr.io/distroless/base-debian11 AS build-release-stage

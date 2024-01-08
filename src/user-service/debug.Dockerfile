@@ -9,25 +9,36 @@ COPY go.mod go.sum ./
 RUN go mod download && go mod verify
 
 COPY . .
-RUN --mount=type=cache,mode=0755,target=/go/pkg/mod CGO_ENABLED=0 go build -v -o /usr/local/bin/app ./...
+RUN --mount=type=cache,mode=0755,target=/go/pkg/mod CGO_ENABLED=0 go build -v -o /usr/local/bin/app ./item-service/main.go
 
 ## Run the tests in the container
 #FROM build-stage AS run-test-stage
 #RUN go test -v ./...
 
 FROM alpine:latest AS build-release-stage
-FROM ubuntu:latest AS build-release-stage
 
 WORKDIR /
 
 COPY --from=build-stage /go/bin/dlv /dlv
 RUN chmod u+x /dlv
 COPY --from=build-stage /usr/local/bin/app /app
-# TODO: remove
-COPY --from=build-stage /usr/src/app/.env.docker /.env
 
 EXPOSE 8080 40000
 
+ARG COUCHBASE_CONNECTION_STRING
+ARG COUCHBASE_USERNAME
+ARG COUCHBASE_PASSWORD
+ARG COUCHBASE_BUCKET
+ARG SERVICE_NAME
+ARG SERVICE_VERSION
+
+ENV COUCHBASE_CONNECTION_STRING $COUCHBASE_CONNECTION_STRING
+ENV COUCHBASE_USERNAME $COUCHBASE_USERNAME
+ENV COUCHBASE_PASSWORD $COUCHBASE_PASSWORD
+ENV SERVICE_NAME $SERVICE_NAME
+ENV SERVICE_VERSION $SERVICE_VERSION
+
+
 #ENTRYPOINT ["/app"]
 #CMD ["/bin/sh"]
-CMD ./dlv --listen=:40000 --headless=true --api-version=2 --log exec ./app -- --config /.env
+CMD ./dlv --listen=:40000 --headless=true --api-version=2 --log exec ./app

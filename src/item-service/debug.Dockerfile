@@ -2,34 +2,29 @@ FROM golang:1.21 AS build-stage
 
 WORKDIR /usr/src/app
 
+RUN go install github.com/go-delve/delve/cmd/dlv@latest
+# --mount=type=cache,mode=0755,target=/go/pkg/mod- CGO_ENABLED=0
+
 # pre-copy/cache go.mod for pre-downloading dependencies and only redownloading them in subsequent builds if they change
 COPY ../../go.mod ../../go.sum ./
 RUN go mod download && go mod verify
 
 COPY . .
-RUN --mount=type=cache,mode=0755,target=/go/pkg/mod GOARCH=amd64 CGO_ENABLED=0 GOOS=linux go build -v -o /usr/local/bin/app ./user-service/main.go
+RUN --mount=type=cache,mode=0755,target=/go/pkg/mod CGO_ENABLED=0 go build -v -o /usr/local/bin/app ./item-service/main.go
 
 ## Run the tests in the container
 #FROM build-stage AS run-test-stage
 #RUN go test -v ./...
 
-# Deploy the application binary into a lean image
-#FROM gcr.io/distroless/base-debian11 AS build-release-stage
-FROM --platform=linux/amd64 alpine:latest AS build-release-stage
-#FROM --platform=linux/amd64 ubuntu:latest AS build-release-stage
-
-RUN addgroup --system nonroot
-RUN adduser --system nonroot --ingroup nonroot
+FROM alpine:latest AS build-release-stage
 
 WORKDIR /
 
+COPY --from=build-stage /go/bin/dlv /dlv
+RUN chmod u+x /dlv
 COPY --from=build-stage /usr/local/bin/app /app
 
-RUN apk add libcap && setcap 'cap_net_bind_service=+ep' /app
-
-EXPOSE 8080
-
-USER nonroot:nonroot
+EXPOSE 8080 40000
 
 ARG COUCHBASE_CONNECTION_STRING
 ARG COUCHBASE_USERNAME
@@ -43,7 +38,8 @@ ENV COUCHBASE_USERNAME $COUCHBASE_USERNAME
 ENV COUCHBASE_PASSWORD $COUCHBASE_PASSWORD
 ENV SERVICE_NAME $SERVICE_NAME
 ENV SERVICE_VERSION $SERVICE_VERSION
-ENV GIN_MODE release
 
-ENTRYPOINT ["/app"]
+
+#ENTRYPOINT ["/app"]
 #CMD ["/bin/sh"]
+CMD ./dlv --listen=:40000 --headless=true --api-version=2 --log exec ./app

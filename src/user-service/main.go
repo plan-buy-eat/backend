@@ -6,15 +6,23 @@ import (
 	"fmt"
 	"github.com/couchbase/gocb/v2"
 	_ "github.com/joho/godotenv/autoload"
-	"log"
+	"github.com/rs/zerolog"
+	"github.com/shoppinglist/log"
 	"net/http"
 	"os"
 	"os/signal"
 	"time"
 )
 
+var serviceName string
+var port = "80"
+
 func main() {
-	go func() {
+	serviceName = os.Getenv("SERVICE_NAME")
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+	log.Logger().Info().Any("env", os.Environ()).Msgf("Env")
+
+	c := func() {
 		// Uncomment following line to enable logging
 		//gocb.SetLogger(gocb.VerboseStdioLogger())
 
@@ -25,8 +33,8 @@ func main() {
 		//connectionString := "127.0.0.1?network=external"
 		bucketName := os.Getenv("COUCHBASE_BUCKET")
 		username := os.Getenv("COUCHBASE_USERNAME")
-		password := os.Getenv("COUCHBASE_USERNAME")
-		fmt.Println(connectionString, bucketName, username, password)
+		password := os.Getenv("COUCHBASE_PASSWORD")
+		fmt.Print(connectionString, bucketName, username, password)
 
 		cluster, err := gocb.Connect(connectionString, gocb.ClusterOptions{
 			Authenticator: gocb.PasswordAuthenticator{
@@ -35,7 +43,7 @@ func main() {
 			},
 		})
 		if err != nil {
-			log.Println(err)
+			log.Logger().Err(err)
 			return
 		}
 
@@ -43,7 +51,7 @@ func main() {
 
 		err = bucket.WaitUntilReady(5*time.Second, nil)
 		if err != nil {
-			log.Println(err)
+			log.Logger().Err(err)
 			return
 
 		}
@@ -51,6 +59,7 @@ func main() {
 		// Get a reference to the default collection, required for older Couchbase server versions
 		// col := bucket.DefaultCollection()
 
+		// TODO: create scope and collections if not exists
 		col := bucket.Scope("0").Collection("users")
 
 		type User struct {
@@ -67,7 +76,7 @@ func main() {
 				Interests: []string{"Swimming", "Rowing"},
 			}, nil)
 		if err != nil {
-			log.Println(err)
+			log.Logger().Err(err)
 			return
 
 		}
@@ -75,7 +84,7 @@ func main() {
 		// Get the document back
 		getResult, err := col.Get("u:jade", nil)
 		if err != nil {
-			log.Println(err)
+			log.Logger().Err(err)
 			return
 
 		}
@@ -83,7 +92,7 @@ func main() {
 		var inUser User
 		err = getResult.Content(&inUser)
 		if err != nil {
-			log.Println(err)
+			log.Logger().Err(err)
 			return
 
 		}
@@ -96,7 +105,7 @@ func main() {
 		//	&gocb.QueryOptions{Adhoc: true},
 		//)
 		//if err != nil {
-		//	log.Println(err)
+		//	log.Print(err)
 		//	return
 		//
 		//}
@@ -106,37 +115,44 @@ func main() {
 		//	var result interface{}
 		//	err := queryResult.Row(&result)
 		//	if err != nil {
-		//		log.Println(err)
+		//		log.Print(err)
 		//		return
 		//
 		//	}
-		//	fmt.Println(result)
+		//	fmt.Print(result)
 		//}
 		//
 		//if err := queryResult.Err(); err != nil {
-		//	log.Println(err)
+		//	log.Print(err)
 		//	return
 		//
 		//}
-	}()
+	}
+	_ = c
+	c()
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("HTTP %s %s%s\n", r.Method, r.Host, r.URL)
+		log.Logger().Info().Msgf("HTTP %s %s%s\n", r.Method, r.Host, r.URL)
+		// ctx := r.Context()
 
-		if r.URL.Path != "/" {
+		if r.URL.Path == "/healthz" && r.Method == "GET" {
+			w.Header().Set("Content-Type", "text/plain")
+			t := fmt.Sprintf("%s: %s\n", serviceName, time.Now().Local().Format(time.RFC1123Z))
+			log.Logger().Printf("response %s\n", t)
+			_, err := w.Write([]byte(t + "\n"))
+			if err != nil {
+				log.Logger().Err(err).Msg("Error writing response")
+				http.Error(w, "Server Error", http.StatusInternalServerError)
+				return
+			}
+		} else {
 			http.Error(w, "Not Found", http.StatusNotFound)
 			return
 		}
-
-		w.Header().Set("Content-Type", "text/plain")
-		_, err := w.Write([]byte(time.Now().Local().Format(time.RFC1123Z)))
-		if err != nil {
-			log.Printf("Error writing response: %v", err)
-		}
 	})
 
-	listenAddress := ":8080"
-	log.Printf("Listening at %s", listenAddress)
+	listenAddress := fmt.Sprintf(":%s", port)
+	log.Logger().Info().Msgf("Listening at %s", listenAddress)
 
 	httpServer := http.Server{
 		Addr: listenAddress,
@@ -148,16 +164,16 @@ func main() {
 		signal.Notify(sigint, os.Interrupt)
 		<-sigint
 		if err := httpServer.Shutdown(context.Background()); err != nil {
-			log.Printf("HTTP Server Shutdown Error: %v", err)
+			log.Logger().Info().Msgf("HTTP Server Shutdown Error: %v", err)
 		}
 		close(idleConnectionsClosed)
 	}()
 
 	if err := httpServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-		log.Fatalf("HTTP server ListenAndServe Error: %v", err)
+		log.Logger().Fatal().Msgf("HTTP server ListenAndServe Error")
 	}
 
 	<-idleConnectionsClosed
 
-	log.Printf("Bye bye")
+	log.Logger().Info().Msgf("Bye bye")
 }

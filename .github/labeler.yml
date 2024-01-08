@@ -25,7 +25,7 @@ backend:
     - any-glob-to-any-file: ['**/go.sum', '**/*.go', '**/go.mod']
 
 release:
- - base-branch: 'main'
+ - base-branch: 'master'
 
 dev-branch:
  - base-branch: 'dev'

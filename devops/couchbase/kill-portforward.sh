@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 ps aux | grep kubectl
 printf "%s " "Press enter to continue"
 read ans
