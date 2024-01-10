@@ -8,7 +8,7 @@ spec:
     kind: RunnerDeployment
     name: k8s-action-runner     # Name of RunnerDeployment
   minReplicas: 1
-  maxReplicas: 5
+  maxReplicas: 7
   metrics:
     - type: PercentageRunnersBusy
       scaleUpThreshold: '0.75'    # The percentage of busy runners at which the number of desired runners are re-evaluated to scale up
