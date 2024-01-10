@@ -43,13 +43,13 @@ build-user-service-debug:
 	docker build -t oltur/user-service:debug-$(SERVICE_VERSION)  --build-arg SERVICE_NAME=user-service -f src/user-service/Dockerfile ./src
 	docker push oltur/user-service:debug-$(SERVICE_VERSION)
 
-.PHONY: install-user-service
-install-user-service: # build-user-service
-	# kind load docker-image user-service:
-	$(eval COUCHBASE_PASSWORD=$(shell helm status couchbase --namespace couchbase | sed -n -e 's/^.*password: //p'))
-	$(eval SERVICE_VERSION=$(SERVICE_VERSION))
-	$(eval DEBUG=false)
-	helm install user-service --values devops/user-service/values.yaml --set SERVICE_NAME=user-service --set DEBUG=$(DEBUG) --set COUCHBASE_PASSWORD=$(COUCHBASE_PASSWORD) --set SERVICE_VERSION=$(SERVICE_VERSION) devops/service
+#.PHONY: install-user-service
+#install-user-service: # build-user-service
+#	# kind load docker-image user-service:
+#	$(eval COUCHBASE_PASSWORD=$(shell helm status couchbase --namespace couchbase | sed -n -e 's/^.*password: //p'))
+#	$(eval SERVICE_VERSION=$(SERVICE_VERSION))
+#	$(eval DEBUG=false)
+#	helm install user-service --values devops/user-service/values.yaml --set SERVICE_NAME=user-service --set DEBUG=$(DEBUG) --set COUCHBASE_PASSWORD=$(COUCHBASE_PASSWORD) --set SERVICE_VERSION=$(SERVICE_VERSION) devops/service
 
 .PHONY: upgrade-user-service
 upgrade-user-service: # build-user-service
@@ -57,15 +57,15 @@ upgrade-user-service: # build-user-service
 	$(eval COUCHBASE_PASSWORD=$(shell helm status couchbase --namespace couchbase | sed -n -e 's/^.*password: //p'))
 	$(eval SERVICE_VERSION=$(SERVICE_VERSION))
 	$(eval DEBUG=false)
-	helm upgrade user-service --values devops/user-service/values.yaml --set SERVICE_NAME=user-service --set DEBUG=$(DEBUG) --set COUCHBASE_PASSWORD=$(COUCHBASE_PASSWORD) --set SERVICE_VERSION=$(SERVICE_VERSION) devops/service
+	helm upgrade --install user-service --values devops/user-service/values.yaml --set SERVICE_NAME=user-service --set DEBUG=$(DEBUG) --set COUCHBASE_PASSWORD=$(COUCHBASE_PASSWORD) --set SERVICE_VERSION=$(SERVICE_VERSION) devops/service
 
-.PHONY: install-user-service-debug
-install-user-service-debug: # build-user-service-debug
-	# kind load docker-image user-service:
-	$(eval COUCHBASE_PASSWORD=$(shell helm status couchbase --namespace couchbase | sed -n -e 's/^.*password: //p'))
-	$(eval SERVICE_VERSION=$(SERVICE_VERSION))
-	$(eval DEBUG=true)
-	helm install user-service --values devops/user-service/values.yaml --set SERVICE_NAME=user-service --set DEBUG=$(DEBUG) --set COUCHBASE_PASSWORD=$(COUCHBASE_PASSWORD) --set SERVICE_VERSION=$(SERVICE_VERSION) devops/service
+#.PHONY: install-user-service-debug
+#install-user-service-debug: # build-user-service-debug
+#	# kind load docker-image user-service:
+#	$(eval COUCHBASE_PASSWORD=$(shell helm status couchbase --namespace couchbase | sed -n -e 's/^.*password: //p'))
+#	$(eval SERVICE_VERSION=$(SERVICE_VERSION))
+#	$(eval DEBUG=true)
+#	helm install user-service --values devops/user-service/values.yaml --set SERVICE_NAME=user-service --set DEBUG=$(DEBUG) --set COUCHBASE_PASSWORD=$(COUCHBASE_PASSWORD) --set SERVICE_VERSION=$(SERVICE_VERSION) devops/service
 
 .PHONY: upgrade-user-service-debug
 upgrade-user-service-debug: # build-user-service-debug
@@ -73,7 +73,7 @@ upgrade-user-service-debug: # build-user-service-debug
 	$(eval COUCHBASE_PASSWORD=$(shell helm status couchbase --namespace couchbase | sed -n -e 's/^.*password: //p'))
 	$(eval SERVICE_VERSION=$(SERVICE_VERSION))
 	$(eval DEBUG=true)
-	helm upgrade user-service --values devops/user-service/values.yaml --set SERVICE_NAME=user-service --set DEBUG=$(DEBUG) --set COUCHBASE_PASSWORD=$(COUCHBASE_PASSWORD) --set SERVICE_VERSION=$(SERVICE_VERSION) devops/service
+	helm upgrade --install user-service --values devops/user-service/values.yaml --set SERVICE_NAME=user-service --set DEBUG=$(DEBUG) --set COUCHBASE_PASSWORD=$(COUCHBASE_PASSWORD) --set SERVICE_VERSION=$(SERVICE_VERSION) devops/service
 
 .PHONY: uninstall-user-service
 uninstall-user-service:
@@ -91,21 +91,21 @@ build-item-service-debug:
 	docker build -t oltur/item-service:debug-$(SERVICE_VERSION) --build-arg SERVICE_NAME=user-service -f src/item-service/debug.Dockerfile ./src
 	docker push oltur/item-service:debug-$(SERVICE_VERSION)
 
-.PHONY: install-item-service
-install-item-service: # build-item-service
-	# kind load docker-image item-service:
-	$(eval COUCHBASE_PASSWORD=$(shell helm status couchbase --namespace couchbase | sed -n -e 's/^.*password: //p'))
-	$(eval SERVICE_VERSION=$(SERVICE_VERSION))
-	$(eval DEBUG=false)
-	helm install item-service --values devops/item-service/values.yaml --set DEBUG=$(DEBUG) --set COUCHBASE_PASSWORD=$(COUCHBASE_PASSWORD) --set SERVICE_VERSION=$(SERVICE_VERSION) devops/service
+#.PHONY: install-item-service
+#install-item-service: # build-item-service
+#	# kind load docker-image item-service:
+#	$(eval COUCHBASE_PASSWORD=$(shell helm status couchbase --namespace couchbase | sed -n -e 's/^.*password: //p'))
+#	$(eval SERVICE_VERSION=$(SERVICE_VERSION))
+#	$(eval DEBUG=false)
+#	helm install item-service --values devops/item-service/values.yaml --set DEBUG=$(DEBUG) --set COUCHBASE_PASSWORD=$(COUCHBASE_PASSWORD) --set SERVICE_VERSION=$(SERVICE_VERSION) devops/service
 
-.PHONY: install-item-service-debug
-install-item-service-debug: # build-item-service-debug
-	# kind load docker-image item-service:
-	$(eval COUCHBASE_PASSWORD=$(shell helm status couchbase --namespace couchbase | sed -n -e 's/^.*password: //p'))
-	$(eval SERVICE_VERSION=$(SERVICE_VERSION))
-	$(eval DEBUG=true)
-	helm install item-service --values devops/item-service/values.yaml --set DEBUG=$(DEBUG) --set COUCHBASE_PASSWORD=$(COUCHBASE_PASSWORD) --set SERVICE_VERSION=$(SERVICE_VERSION) devops/service
+#.PHONY: install-item-service-debug
+#install-item-service-debug: # build-item-service-debug
+#	# kind load docker-image item-service:
+#	$(eval COUCHBASE_PASSWORD=$(shell helm status couchbase --namespace couchbase | sed -n -e 's/^.*password: //p'))
+#	$(eval SERVICE_VERSION=$(SERVICE_VERSION))
+#	$(eval DEBUG=true)
+#	helm install item-service --values devops/item-service/values.yaml --set DEBUG=$(DEBUG) --set COUCHBASE_PASSWORD=$(COUCHBASE_PASSWORD) --set SERVICE_VERSION=$(SERVICE_VERSION) devops/service
 
 .PHONY: upgrade-item-service
 upgrade-item-service: # build-item-service
@@ -113,7 +113,7 @@ upgrade-item-service: # build-item-service
 	$(eval COUCHBASE_PASSWORD=$(shell helm status couchbase --namespace couchbase | sed -n -e 's/^.*password: //p'))
 	$(eval SERVICE_VERSION=$(SERVICE_VERSION))
 	$(eval DEBUG=false)
-	helm upgrade item-service --values devops/item-service/values.yaml --set SERVICE_NAME=item-service --set DEBUG=$(DEBUG) --set COUCHBASE_PASSWORD=$(COUCHBASE_PASSWORD) --set SERVICE_VERSION=$(SERVICE_VERSION) devops/service
+	helm upgrade --install item-service --values devops/item-service/values.yaml --set SERVICE_NAME=item-service --set DEBUG=$(DEBUG) --set COUCHBASE_PASSWORD=$(COUCHBASE_PASSWORD) --set SERVICE_VERSION=$(SERVICE_VERSION) devops/service
 
 .PHONY: upgrade-item-service-debug
 upgrade-item-service-debug: # build-item-service-debug
@@ -121,7 +121,7 @@ upgrade-item-service-debug: # build-item-service-debug
 	$(eval COUCHBASE_PASSWORD=$(shell helm status couchbase --namespace couchbase | sed -n -e 's/^.*password: //p'))
 	$(eval SERVICE_VERSION=$(SERVICE_VERSION))
 	$(eval DEBUG=true)
-	helm upgrade item-service --values devops/item-service/values.yaml --set SERVICE_NAME=item-service --set DEBUG=$(DEBUG) --set COUCHBASE_PASSWORD=$(COUCHBASE_PASSWORD) --set SERVICE_VERSION=$(SERVICE_VERSION) devops/service
+	helm upgrade --install item-service --values devops/item-service/values.yaml --set SERVICE_NAME=item-service --set DEBUG=$(DEBUG) --set COUCHBASE_PASSWORD=$(COUCHBASE_PASSWORD) --set SERVICE_VERSION=$(SERVICE_VERSION) devops/service
 
 .PHONY: uninstall-item-service
 uninstall-item-service:
@@ -189,7 +189,7 @@ status-couchbase:
 
 .PHONY: expose-couchbase-ui
 expose-couchbase-ui:
-	kubectl port-forward --namespace couchbase couchbase-0000 38091:8091
+	kubectl port-forward --namespace couchbase couchbase-0001 38091:8091
 
 .PHONY: expose-couchbase-api
 expose-couchbase-api:
@@ -226,9 +226,22 @@ lint:
       -e VALIDATE_NATURAL_LANGUAGE=false \
       -e VALIDATE_DOCKERFILE_HADOLINT=false \
       -e VALIDATE_ENV=false \
+      -e VALIDATE_JSCPD=false \
       -e FILTER_REGEX_EXCLUDE=$(FILTER_REGEX_EXCLUDE) \
       -v .:/tmp/lint \
       --rm \
       --platform linux/amd64 \
       ghcr.io/super-linter/super-linter:latest
 #            -e ACTIONS_RUNNER_DEBUG=true \
+
+.PHONY: install-self-hosted-github-runners
+install-self-hosted-github-runners:
+	kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.3/cert-manager.crds.yaml
+	helm repo add jetstack https://charts.jetstack.io
+	helm install cert-manager --namespace cert-manager --version v1.13.3 jetstack/cert-manager --create-namespace
+	kubectl create ns actions-runner-system
+	kubectl create secret generic controller-manager -n actions-runner-system --from-literal=github_token=ghp_?????????????????? #self-hosted-runners-cluster-prod
+	helm repo add actions-runner-controller https://actions-runner-controller.github.io/actions-runner-controller
+	helm repo update
+	helm upgrade --install --namespace actions-runner-system --create-namespace --wait actions-runner-controller actions-runner-controller/actions-runner-controller --set syncPeriod=1m
+	kubectl create -f ./devops/self-hosted-runners/runner.yaml

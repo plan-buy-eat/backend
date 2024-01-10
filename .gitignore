@@ -65,3 +65,5 @@ devops/k8s/
 
 core.*
 *.core
+
+secrets.txt

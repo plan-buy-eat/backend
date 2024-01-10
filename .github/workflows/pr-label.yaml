@@ -15,8 +15,8 @@ concurrency:
 jobs:
   label:
     name: Label
-    runs-on: ubuntu-latest
-    # runs-on: checks-stateful-runners
+#    runs-on: ubuntu-latest
+    runs-on: actions_runner_dev
     permissions:
       contents: read
       pull-requests: write
