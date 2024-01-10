@@ -245,3 +245,4 @@ install-self-hosted-github-runners:
 	helm repo update
 	helm upgrade --install --namespace actions-runner-system --create-namespace --wait actions-runner-controller actions-runner-controller/actions-runner-controller --set syncPeriod=1m
 	kubectl create -f ./devops/self-hosted-runners/runner.yaml
+	kubectl apply -f ./devops/self-hosted-runners/horizontal_runner_autoscaler.yaml
