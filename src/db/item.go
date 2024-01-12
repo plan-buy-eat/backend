@@ -5,19 +5,17 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/couchbase/gocb/v2"
-	"github.com/couchbase/gocb/v2/search"
 	"github.com/rs/xid"
 	"github.com/shoppinglist/log"
 	"github.com/shoppinglist/models"
-	"slices"
 	"time"
 )
 
 type ItemsDB interface {
 	UpsertItem(ctx context.Context, inId string, item *models.Item) (id string, err error)
 	GetItem(ctx context.Context, id string) (item *models.Item, err error)
-	GetItems(ctx context.Context, q *PaginationQuery) (items []*models.ItemWithID, total int, err error)
-	SearchItems(ctx context.Context, query string) (items []*models.ItemWithID, err error)
+	GetItems(ctx context.Context, q *PaginationQuery, searchQuery string) (items []*models.ItemWithID, total int, err error)
+	//SearchItems(ctx context.Context, query string) (items []*models.ItemWithID, err error)
 	DeleteItem(ctx context.Context, id string) (err error)
 	BuyItem(ctx context.Context, id string, bought bool) (err error)
 }
@@ -106,18 +104,23 @@ func (d *db) BuyItem(ctx context.Context, id string, bought bool) (err error) {
 	return
 }
 
-func (d *db) GetItems(ctx context.Context, q *PaginationQuery) (items []*models.ItemWithID, total int, err error) {
-	query := "SELECT meta(x).id, x.* FROM items x"
-	queryTotal := "SELECT COUNT(*) as total FROM items x"
+func (d *db) GetItems(ctx context.Context, q *PaginationQuery, searchQuery string) (items []*models.ItemWithID, total int, err error) {
+	query := "SELECT meta(x).id, x.* FROM items x WHERE 1=1"
+	queryTotal := "SELECT COUNT(*) as total FROM items x WHERE 1=1"
 
 	if d.bought.Valid {
 		if d.bought.Bool {
-			query += fmt.Sprintf("\nWHERE x.bought = true")
-			queryTotal += fmt.Sprintf("\nWHERE x.bought = true")
+			query += fmt.Sprintf("\nAND x.bought = true")
+			queryTotal += fmt.Sprintf("\nAND x.bought = true")
 		} else {
-			query += fmt.Sprintf("\nWHERE x.bought = false")
-			queryTotal += fmt.Sprintf("\nWHERE x.bought = false")
+			query += fmt.Sprintf("\nAND x.bought = false")
+			queryTotal += fmt.Sprintf("\nAND x.bought = false")
 		}
+	}
+
+	if searchQuery != "" {
+		query += fmt.Sprintf("\nAND SEARCH(x, $searchQuery)")
+		queryTotal += fmt.Sprintf("\nAND SEARCH(x, $searchQuery)")
 	}
 
 	if q.Order == "" {
@@ -136,7 +139,9 @@ func (d *db) GetItems(ctx context.Context, q *PaginationQuery) (items []*models.
 	}
 
 	log.Logger().Info().Msgf("Query: %s", query)
-	params := make(map[string]interface{})
+	params := map[string]interface{}{
+		"searchQuery": searchQuery,
+	}
 	queryResult, err := d.scope.Query(query, &gocb.QueryOptions{Adhoc: true, Context: ctx, NamedParameters: params})
 	if err != nil {
 		log.Logger().Err(err)
@@ -157,7 +162,9 @@ func (d *db) GetItems(ctx context.Context, q *PaginationQuery) (items []*models.
 		return
 	}
 
-	paramsTotal := make(map[string]interface{})
+	paramsTotal := map[string]interface{}{
+		"searchQuery": searchQuery,
+	}
 	queryResultTotal, err := d.scope.Query(queryTotal, &gocb.QueryOptions{Adhoc: true, Context: ctx, NamedParameters: paramsTotal})
 	if err != nil {
 		log.Logger().Err(err)
@@ -174,64 +181,64 @@ func (d *db) GetItems(ctx context.Context, q *PaginationQuery) (items []*models.
 	return
 }
 
-func (d *db) SearchItems(ctx context.Context, query string) (items []*models.ItemWithID, err error) {
-	matchResult, err := d.cluster.SearchQuery(
-		"title-index",
-		search.NewConjunctionQuery(
-			search.NewMatchQuery(query),
-			//search.NewDateRangeQuery().Start("2019-01-01", true).End("2029-02-01", false),
-		),
-		&gocb.SearchOptions{
-			Limit:   10000,
-			Fields:  d.fields,
-			Context: ctx,
-		},
-	)
-	if err != nil {
-		return nil, err
-
-	}
-
-	itemSearchResults := make([]*models.ItemSearchResult, 0)
-	// Print each found Row
-	for matchResult.Next() {
-		var itemSearchResult models.ItemSearchResult
-		row := matchResult.Row()
-		err = row.Fields(&itemSearchResult)
-		if err != nil {
-			log.Logger().Err(err)
-			return
-		}
-		itemSearchResult.ID = row.ID
-		itemSearchResult.Score = row.Score
-		itemSearchResults = append(itemSearchResults, &itemSearchResult)
-	}
-	if err = matchResult.Err(); err != nil {
-		log.Logger().Err(err)
-		return
-	}
-
-	slices.SortFunc(itemSearchResults, func(i, j *models.ItemSearchResult) int {
-		return int(j.Score - i.Score)
-	})
-
-	items = make([]*models.ItemWithID, 0, len(itemSearchResults))
-	for _, result := range itemSearchResults {
-		items = append(items, &models.ItemWithID{
-			Item: models.Item{
-				Title:  result.Title,
-				Amount: result.Amount,
-				Unit:   result.Unit,
-				Bought: result.Bought,
-				Shop:   result.Shop,
-			},
-			ID: result.ID,
-		})
-	}
-
-	return
-
-}
+//func (d *db) SearchItems(ctx context.Context, query string) (items []*models.ItemWithID, err error) {
+//	matchResult, err := d.cluster.SearchQuery(
+//		"title-index",
+//		search.NewConjunctionQuery(
+//			search.NewMatchQuery(query),
+//			//search.NewDateRangeQuery().Start("2019-01-01", true).End("2029-02-01", false),
+//		),
+//		&gocb.SearchOptions{
+//			Limit:   10000,
+//			Fields:  d.fields,
+//			Context: ctx,
+//		},
+//	)
+//	if err != nil {
+//		return nil, err
+//
+//	}
+//
+//	itemSearchResults := make([]*models.ItemSearchResult, 0)
+//	// Print each found Row
+//	for matchResult.Next() {
+//		var itemSearchResult models.ItemSearchResult
+//		row := matchResult.Row()
+//		err = row.Fields(&itemSearchResult)
+//		if err != nil {
+//			log.Logger().Err(err)
+//			return
+//		}
+//		itemSearchResult.ID = row.ID
+//		itemSearchResult.Score = row.Score
+//		itemSearchResults = append(itemSearchResults, &itemSearchResult)
+//	}
+//	if err = matchResult.Err(); err != nil {
+//		log.Logger().Err(err)
+//		return
+//	}
+//
+//	slices.SortFunc(itemSearchResults, func(i, j *models.ItemSearchResult) int {
+//		return int(j.Score - i.Score)
+//	})
+//
+//	items = make([]*models.ItemWithID, 0, len(itemSearchResults))
+//	for _, result := range itemSearchResults {
+//		items = append(items, &models.ItemWithID{
+//			Item: models.Item{
+//				Title:  result.Title,
+//				Amount: result.Amount,
+//				Unit:   result.Unit,
+//				Bought: result.Bought,
+//				Shop:   result.Shop,
+//			},
+//			ID: result.ID,
+//		})
+//	}
+//
+//	return
+//
+//}
 
 func (d *db) DeleteItem(ctx context.Context, id string) (err error) {
 	_, err = d.collection.Remove(id,

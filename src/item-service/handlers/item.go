@@ -143,27 +143,18 @@ func (h *itemHandler) GetItems(c *gin.Context) {
 
 	var itemsOut []*models.ItemWithID
 	var total int
-	if p.Query != "" {
-		itemsOut, err = itemsDB.SearchItems(ctx, p.Query)
-		if err != nil {
-			h.err(c, "searching items", err)
-		}
-		c.Header("X-Total-Count", strconv.Itoa(len(itemsOut)))
-		h.res(c, itemsOut)
-	} else {
-		itemsOut, total, err = itemsDB.GetItems(ctx, &db.PaginationQuery{
-			Start: p.Start,
-			End:   p.End,
-			Sort:  p.Sort,
-			Order: p.Order,
-			Query: p.Query,
-		})
-		if err != nil {
-			h.err(c, "getting items", err)
-		}
-		c.Header("X-Total-Count", strconv.Itoa(total))
-		h.res(c, itemsOut)
+	itemsOut, total, err = itemsDB.GetItems(ctx, &db.PaginationQuery{
+		Start: p.Start,
+		End:   p.End,
+		Sort:  p.Sort,
+		Order: p.Order,
+		Query: p.Query,
+	}, p.Query)
+	if err != nil {
+		h.err(c, "getting items", err)
 	}
+	c.Header("X-Total-Count", strconv.Itoa(total))
+	h.res(c, itemsOut)
 
 	c.Status(http.StatusOK)
 }
