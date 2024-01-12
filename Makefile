@@ -228,7 +228,9 @@ lint:
       -e VALIDATE_ENV=false \
       -e VALIDATE_JSCPD=false \
       -e FILTER_REGEX_EXCLUDE=$(FILTER_REGEX_EXCLUDE) \
-      -e KUBERNETES_KUBECONFORM_OPTIONS= "--ignore-missing-schemas" \
+      -e KUBERNETES_KUBECONFORM_OPTIONS="--ignore-missing-schemas" \
+      -e LINTER_RULES_PATH=".github/linters" \
+      -e GITHUB_ACTIONS_COMMAND_ARGS="-shellcheck=" \
       -v .:/tmp/lint \
       --rm \
       --platform linux/amd64 \

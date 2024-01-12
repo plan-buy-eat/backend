@@ -71,3 +71,4 @@ jobs:
           VALIDATE_JSCPD: false
           KUBERNETES_KUBECONFORM_OPTIONS: "--ignore-missing-schemas"
           LINTER_RULES_PATH: ".github/linters"
+          GITHUB_ACTIONS_COMMAND_ARGS: "-shellcheck="
