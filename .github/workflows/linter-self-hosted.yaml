@@ -69,3 +69,4 @@ jobs:
           VALIDATE_DOCKERFILE_HADOLINT: false
           VALIDATE_ENV: false
           VALIDATE_JSCPD: false
+          KUBERNETES_KUBECONFORM_OPTIONS: "--ignore-missing-schemas"

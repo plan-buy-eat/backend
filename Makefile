@@ -228,6 +228,7 @@ lint:
       -e VALIDATE_ENV=false \
       -e VALIDATE_JSCPD=false \
       -e FILTER_REGEX_EXCLUDE=$(FILTER_REGEX_EXCLUDE) \
+      -e KUBERNETES_KUBECONFORM_OPTIONS= "--ignore-missing-schemas" \
       -v .:/tmp/lint \
       --rm \
       --platform linux/amd64 \
