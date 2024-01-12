@@ -1,0 +1,6 @@
+self-hosted-runner:
+  # Labels of self-hosted runner in array of string
+  labels:
+    - actions_runner_dev
+    - actions_runner_prod
+    - self-hosted

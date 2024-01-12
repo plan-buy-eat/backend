@@ -70,3 +70,4 @@ jobs:
           VALIDATE_ENV: false
           VALIDATE_JSCPD: false
           KUBERNETES_KUBECONFORM_OPTIONS: "--ignore-missing-schemas"
+          LINTER_RULES_PATH: ".github/linters"
