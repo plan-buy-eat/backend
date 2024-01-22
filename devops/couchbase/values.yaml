@@ -1,18 +1,1200 @@
+# Default values for couchbase-operator chart.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Select what to install
+install:
+  # -- Install the couchbase operator
+  couchbaseOperator: true
+  # -- Install the admission controller
+  admissionController: true
+  # -- Install couchbase cluster
+  couchbaseCluster: true
+  # -- Install sync gateway
+  syncGateway: false
+
+# couchbaseOperator is the controller for couchbase cluster
 couchbaseOperator:
-  imagePullPolicy: Always
-#users:
-#  developer:
-#    # When autobind is 'true' then the user is
-#    # created and automatically bound to a group named 'developer'.
-#    autobind: true
-#    # password to use for user authentication
-#    # (alternatively use authSecret)
-#    password: password
-#    # optional secret to use containing user password
-#    authSecret:
-#    # domain of user authentication
-#    authDomain: local
-#    # roles attributed to group
+  # -- Name of the couchbase operator Deployment
+  name: "couchbase-operator"
+  # -- Image specifies repository and tag of the Couchbase Operator container.
+  image:
+    repository: couchbase/operator
+    tag: 2.5.0
+  # -- The policy for pulling images from the repository onto hosts.
+  # The imagePullPolicy value defaults to IfNotPresent, which means
+  # that images are only pulled if they’re not present on the Kubernetes node.
+  # Values allowed are Always, IfNotPresent, and Never.
+  imagePullPolicy: IfNotPresent
+  # -- ImagePullSecrets is an optional list of references to secrets to use for pulling images.
+  imagePullSecrets: []
+  # -- Set of command-line flags to pass on to the Operator to modify its behavior.
+  # see: https://docs.couchbase.com/operator/2.0/reference-operator-configuration.html#command-line-arguments
+  commandArgs:
+    # -- Pod creation timeout. The Operator allows the timeout of pod creation to be manually configured.
+    # It is primarily intended for use on cloud platforms where the deployment of multiple volumes and
+    # pulling of a Couchbase Server container image may take a longer time than the default timeout period.
+    pod-create-timeout: 10m
+  # -- Resource Limits and requests for Pod CPU and Memory
+  resources: {}
+  # -- Specify a node selection constraint for couchbase-admission-operator pod assignment.
+  # -- Ref: https://kubernetes.io/docs/user-guide/node-selection/
+  nodeSelector: {}
+  # -- Tolerations are applied to pods, and allow (but do not require)
+  # the pods to schedule onto nodes with matching taints.
+  tolerations: []
+  # -- RBAC Scope of the Operator. Must be either 'Role' or 'ClusterRole'
+  scope: Role
+
+# admissionController is the controller for couchbase admission controller
+# name is derived from chart
+admissionController:
+  name: "couchbase-admission-controller"
+  # -- Image specifies repository and tag of the Couchbase Admission container.
+  image:
+    repository: couchbase/admission-controller
+    tag: 2.5.0
+  # -- The policy for pulling images from the repository onto hosts.
+  # The imagePullPolicy value defaults to IfNotPresent, which means
+  # that images are only pulled if they’re not present on the Kubernetes node.
+  # Values allowed are Always, IfNotPresent, and Never.
+  imagePullPolicy: IfNotPresent
+  # -- ImagePullSecrets is an optional list of references to secrets to use for pulling images
+  imagePullSecrets: []
+  # -- Set of command-line flags to pass on to the Admission Controller to modify its behavior.
+  # Do not change.
+  commandArgs:
+    validate-secrets: true
+    validate-storage-classes: true
+    default-file-system-group: true
+  # -- Resource Limits and requests for Pod CPU and Memory
+  resources: {}
+  # -- Specify a node selection constraint for couchbase-admission-controller pod assignment.
+  # Ref: https://kubernetes.io/docs/user-guide/node-selection/
+  nodeSelector: {}
+  # -- Tolerations are applied to pods, and allow (but do not require)
+  # the pods to schedule onto nodes with matching taints.
+  tolerations: []
+  # -- Determines whether the admission controller should log all of its validation notices within the console.
+  # When set to false, only validation errors are logged within the pod’s console.
+  verboseLogging: false
+  # -- Specify whether to run as a non-root user. Running as non-root ensures least privilege.
+  runAsNonRoot: true
+  # -- Disable the creation of Validation webhook. Setting to 'false' may be helpful when
+  # installing into a restricted environments (ie Strict mTLS), since disabling
+  # avoids performing resource fetching and validation from the Kubernetes API server.
+  disableValidatingWebhook: false
+  # -- RBAC Scope of the Admission Controller. Must be either 'Role' or 'ClusterRole'.
+  # When scope is 'ClusterRole' the admission controller is able to validate resources
+  # in all namespaces.  'Role' scope limits validation to a single a namespace.
+  scope: ClusterRole
+
+# admissionService exposes validation to cluster. This service
+# is over https and certs are auto-generated based on `admissionService.name`.
+admissionService:
+  # -- Name of the service (auto-generated)
+  name:
+  # -- Port service exposes
+  port: 443
+  targetPort: 8443
+
+# admissionCA can be used to override the Certs that will be used
+# to sign the keys used by the admission operator.
+admissionCA:
+  # -- A base64 encoded PEM format certificate
+  cert:
+  # -- A base64 encoded PEM format private key
+  key:
+  # -- Expiry time of CA in days for generated certs
+  expiration: 3650
+
+# secret with client certs mounted within the admission controller.
+admissionSecret:
+  # -- Name of the secret (auto-generated)
+  name:
+  # -- PEM format certificate (auto-generated)
+  # override via --set-file
+  cert:
+  # -- PEM format certificate (auto-generated)
+  # override via --set-file
+  key:
+
+# -- Coredns service configuration to be applied to
+# pods for cross-cluster deployments
+coredns:
+  # -- Name of Kubernetes service which exposes DNS endpoints
+  service:
+  # -- Search list for host-name lookup
+  searches:
+  - default.svc.cluster.local
+  - svc.cluster.local
+  - cluster.local
+
+# -- CouchbaseBackups runs a job which preserves data into backups
+backups: {}
+#
+# Uncomment to create a backup named 'my-backup'
+#
+#   default-backup:
+#     name: my-backup
+#     strategy: full_incremental
+#     full:
+#       schedule: "0 3 * * 0"
+#     incremental:
+#       schedule: "0 3 * * 1-6"
+#     successfulJobsHistoryLimit: 1
+#     failedJobsHistoryLimit: 3
+#     backoffLimit: 2
+#     backupRetention: 24h
+#     logRetention: 24h
+#     size: 5Gi
+
+# CouchbaseBackupRestore restores data from backups
+backuprestores: {}
+#
+# Uncomment to create a restore named 'my-restore'
+#
+#   default-restore:
+#     name: my-restore
+#     backup: my-backup
+#     repo: cb-example-2020-11-12T19_00_03
+#     start:
+#     # Pick either int or str
+#       # int: 1
+#       str: oldest
+#     end:
+#       # int: 1
+#       str: latest
+#     backoffLimit: 2
+#     logRetention: 24h
+
+# Users to create for couchbase RBAC.
+# If 'autobind' is set, then Users are automatically created
+# alongside groups with specified roles.  To manually create
+# groups and bind users then set 'autobind' to 'false' and
+# specify 'groups' and 'rolebindings' resources
+users: {}
+#
+# Uncomment to create an example user named 'developer'
+#
+#   developer:
+#     # Automatically bind user to a Group resource.
+#     # See example below of 'developer' user.
+#     # When autobind is 'true' then the user is
+#     # created and automatically bound to a group named 'developer'.
+#     autobind: true
+#     # password to use for user authentication
+#     # (alternatively use authSecret)
+#     password: password
+#     # optional secret to use containing user password
+#     authSecret:
+#     # domain of user authentication
+#     authDomain: local
+#     # roles attributed to group
+#     roles:
+#       - name: bucket_admin
+#         bucket: default
+
+
+# --  Uncomment to create a "couchbasecollectiongroups" resource
+# Defines a group of collections. A collection is a data container, defined on Couchbase Server,
+# within a bucket whose type is either Couchbase or Ephemeral.
+# See https://docs.couchbase.com/operator/current/resource/couchbasecollectiongroup.html
+collectiongroups: {}
+# # -- Name of the CouchbaseCollectionGroup to create. @default -- will be
+# # filled in as below
+# default:
+#   # -- MaxTTL defines how long a document is permitted to exist for, without
+#   # modification, until it is automatically deleted.  This field takes
+#   # precedence over any TTL defined at the bucket level.  This is a default,
+#   # and maximum time-to-live and may be set to a lower value by the client.
+#   # If the client specifies a higher value, then it is truncated to the
+#   # maximum durability.  Documents are removed by Couchbase, after they have
+#   # expired, when either accessed, the expiry pager is run, or the bucket is
+#   # compacted.  When set to 0, then documents are not expired by default.
+#   # This field must be a duration in the range 0-2147483648s, defaulting to 0.
+#   # More info: https://golang.org/pkg/time/#ParseDuration
+#   maxTTL:
+#   # -- Names specifies the names of the collections.  Unlike
+#   # CouchbaseCollection, which specifies a single collection, a collection
+#   # group specifies multiple, and the collection group must specify at least
+#   # one collection name. Any collection names specified must be unique.
+#   # Collection names must be 1-251 characters in length, contain only
+#   # [a-zA-Z1-9_-%] and not start with either _ or %.
+#   names: []
+
+# --  Uncomment to create a "couchbasecollections" resource
+# A collection is a data container, defined on Couchbase Server, within a bucket whose type is either Couchbase or Ephemeral.
+# See https://docs.couchbase.com/operator/current/resource/couchbasecollection.html
+collections: {}
+# # -- Name of the CouchbaseCollection to create. @default -- will be filled in
+# # as below
+# default:
+#   # -- MaxTTL defines how long a document is permitted to exist for, without
+#   # modification, until it is automatically deleted.  This field takes
+#   # precedence over any TTL defined at the bucket level.  This is a default,
+#   # and maximum time-to-live and may be set to a lower value by the client.
+#   # If the client specifies a higher value, then it is truncated to the
+#   # maximum durability.  Documents are removed by Couchbase, after they have
+#   # expired, when either accessed, the expiry pager is run, or the bucket is
+#   # compacted.  When set to 0, then documents are not expired by default.
+#   # This field must be a duration in the range 0-2147483648s, defaulting to 0.
+#   # More info: https://golang.org/pkg/time/#ParseDuration
+#   maxTTL:
+#   # -- Name specifies the name of the collection.  By default, the
+#   # metadata.name is used to define the collection name, however, due to the
+#   # limited character set, this field can be used to override the default and
+#   # provide the full functionality. Additionally the `metadata.name` field is
+#   # a DNS label, and thus limited to 63 characters, this field must be used if
+#   # the name is longer than this limit. Collection names must be 1-251
+#   # characters in length, contain only [a-zA-Z0-9_-%] and not start with
+#   # either _ or %.
+#   name:
+
+# --  Uncomment to create a "couchbasescopegroups" resource
+# CouchbaseScopeGroup represents a logical unit of data storage that sits between buckets and collections e.g.
+# a bucket may contain multiple scopes, and a scope may contain multiple collections.
+#
+# See https://docs.couchbase.com/operator/current/resource/couchbasescopegroup.html
+scopegroups: {}
+# # -- Name of the CouchbaseScopeGroup to create. @default -- will be filled in
+# # as below
+# default:
+#   # -- Collections defines how to collate collections included in this scope
+#   # or scope group. Any of the provided methods may be used to collate a set
+#   # of collections to manage.  Collated collections must have unique names,
+#   # otherwise it is considered ambiguous, and an error condition.  Ref https:/
+#   # /docs.couchbase.com/operator/current/resource/couchbasescopegroup.html#cou
+#   # chbasescopegroups-spec-collections
+#   collections: []
+#   kind: CouchbaseScopeGroup
+#   # -- Names specifies the names of the scopes.  Unlike CouchbaseScope, which
+#   # specifies a single scope, a scope group specifies multiple, and the scope
+#   # group must specify at least one scope name. Any scope names specified must
+#   # be unique. Scope names must be 1-251 characters in length, contain only
+#   # [a-zA-Z0-9_-%] and not start with either _ or %.
+#   names: []
+
+# --  Uncomment to create a "couchbasescopes" resource
+#
+# A scope is simply a single-tier namespace for a group of collections to exist within.
+# Collections within a scope must all have unique names, but collections in different scopes may share the same name.
+# This property allows multi-tenancy.
+#
+# See https://docs.couchbase.com/operator/current/resource/couchbasescope.html
+scopes: {}
+# # -- Name of the CouchbaseScope to create. @default -- will be filled in as
+# # below
+# default:
+#   # -- Collections defines how to collate collections included in this scope
+#   # or scope group. Any of the provided methods may be used to collate a set
+#   # of collections to manage.  Collated collections must have unique names,
+#   # otherwise it is considered ambiguous, and an error condition.  Ref https:/
+#   # /docs.couchbase.com/operator/current/resource/couchbasescope.html#couchbas
+#   # escopes-spec-collections
+#   collections: []
+#   # -- DefaultScope indicates whether this resource represents the default
+#   # scope for a bucket.  When set to `true`, this allows the user to refer to
+#   # and manage collections within the default scope.  When not defined, the
+#   # Operator will implicitly manage the default scope as the default scope can
+#   # not be deleted from Couchbase Server.  The Operator defined default scope
+#   # will also have the `persistDefaultCollection` flag set to `true`.  Only
+#   # one default scope is permitted to be contained in a bucket.
+#   defaultScope: false
+#   kind: CouchbaseScope
+#   # -- Name specifies the name of the scope.  By default, the metadata.name is
+#   # used to define the scope name, however, due to the limited character set,
+#   # this field can be used to override the default and provide the full
+#   # functionality. Additionally the `metadata.name` field is a DNS label, and
+#   # thus limited to 63 characters, this field must be used if the name is
+#   # longer than this limit. Scope names must be 1-251 characters in length,
+#   # contain only [a-zA-Z0-9_-%] and not start with either _ or %.
+#   name:
+
+# --  Uncomment to create a "couchbasegroups" resource
+groups: {}
+#  default:
+#    # -- LDAPGroupRef is a reference to an LDAP group.
+#    ldapGroupRef:
+#    # -- Roles is a list of roles that this group is granted.
 #    roles:
-#      - name: bucket_admin
-#        bucket: defaultØ
+#      # -- Bucket name for bucket admin roles.  When not specified for a role
+#      # that can be scoped to a specific bucket, the role will apply to all
+#      # buckets in the cluster. Deprecated:  Couchbase Autonomous Operator 2.3
+#      bucket:
+#      # -- Bucket level access to apply to specified role. The bucket must
+#      # exist.  When not specified, the bucket field will be checked. If both
+#      # are empty and the role can be scoped to a specific bucket, the role will
+#      # apply to all buckets in the cluster
+#      buckets:
+#        # -- Resources is an explicit list of named bucket resources that will
+#        # be considered for inclusion in this role.  If a resource reference
+#        # doesn't match a resource, then no error conditions are raised due to
+#        # undefined resource creation ordering and eventual consistency.
+#        resources:
+#          # Kind indicates the kind of resource that is being referenced.  A
+#          # Role can only reference `CouchbaseBucket` kind.  This field defaults
+#          # to `CouchbaseBucket` if not specified.
+#          kind: CouchbaseBucket
+#          # Name is the name of the Kubernetes resource name that is being
+#          # referenced.
+#          name:
+#        # -- Selector allows resources to be implicitly considered for inclusion
+#        # in this role.  More info:
+#        # https://kubernetes.io/docs/reference/generated/kubernetes-
+#        # api/v1.21/#labelselector-v1-meta
+#        selector:
+#          # matchExpressions is a list of label selector requirements. The
+#          # requirements are ANDed.
+#          matchExpressions:
+#            # key is the label key that the selector applies to.
+#            key:
+#            # operator represents a key's relationship to a set of values. Valid
+#            # operators are In, NotIn, Exists and DoesNotExist.
+#            operator:
+#            # values is an array of string values. If the operator is In or
+#            # NotIn, the values array must be non-empty. If the operator is
+#            # Exists or DoesNotExist, the values array must be empty. This array
+#            # is replaced during a strategic merge patch.
+#            values:
+#          # matchLabels is a map of {key,value} pairs. A single {key,value} in
+#          # the matchLabels map is equivalent to an element of matchExpressions,
+#          # whose key field is "key", the operator is "In", and the values array
+#          # contains only "value". The requirements are ANDed.
+#          matchLabels:
+#      # -- Collection level access to apply to the specified role.  The
+#      # collection must exist. When not specified, the role is subject to scope
+#      # or bucket level access.
+#      collections:
+#        # -- Resources is an explicit list of named resources that will be
+#        # considered for inclusion in this collection or collections.  If a
+#        # resource reference doesn't match a resource, then no error conditions
+#        # are raised due to undefined resource creation ordering and eventual
+#        # consistency.
+#        resources:
+#          # Kind indicates the kind of resource that is being referenced.  A
+#          # scope can only reference `CouchbaseCollection` and
+#          # `CouchbaseCollectionGroup` resource kinds.  This field defaults to
+#          # `CouchbaseCollection` if not specified.
+#          kind: CouchbaseCollection
+#          # Name is the name of the Kubernetes resource name that is being
+#          # referenced. Legal collection names have a maximum length of 251
+#          # characters and may be composed of any character from "a-z", "A-Z",
+#          # "0-9" and "_-%".
+#          name:
+#        # -- Selector allows resources to be implicitly considered for inclusion
+#        # in this collection or collections.  More info:
+#        # https://kubernetes.io/docs/reference/generated/kubernetes-
+#        # api/v1.21/#labelselector-v1-meta
+#        selector:
+#          # matchExpressions is a list of label selector requirements. The
+#          # requirements are ANDed.
+#          matchExpressions:
+#            # key is the label key that the selector applies to.
+#            key:
+#            # operator represents a key's relationship to a set of values. Valid
+#            # operators are In, NotIn, Exists and DoesNotExist.
+#            operator:
+#            # values is an array of string values. If the operator is In or
+#            # NotIn, the values array must be non-empty. If the operator is
+#            # Exists or DoesNotExist, the values array must be empty. This array
+#            # is replaced during a strategic merge patch.
+#            values:
+#          # matchLabels is a map of {key,value} pairs. A single {key,value} in
+#          # the matchLabels map is equivalent to an element of matchExpressions,
+#          # whose key field is "key", the operator is "In", and the values array
+#          # contains only "value". The requirements are ANDed.
+#          matchLabels:
+#      # -- Name of role.
+#      name:
+#      # -- Scope level access to apply to specified role.  The scope must exist.
+#      # When not specified, the role will apply to selected bucket or all
+#      # buckets in the cluster.
+#      scopes:
+#        # -- Resources is an explicit list of named resources that will be
+#        # considered for inclusion in this scope or scopes.  If a resource
+#        # reference doesn't match a resource, then no error conditions are
+#        # raised due to undefined resource creation ordering and eventual
+#        # consistency.
+#        resources:
+#          # Kind indicates the kind of resource that is being referenced.  A
+#          # scope can only reference `CouchbaseScope` and `CouchbaseScopeGroup`
+#          # resource kinds.  This field defaults to `CouchbaseScope` if not
+#          # specified.
+#          kind: CouchbaseScope
+#          # Name is the name of the Kubernetes resource name that is being
+#          # referenced. Legal scope names have a maximum length of 251
+#          # characters and may be composed of any character from "a-z", "A-Z",
+#          # "0-9" and "_-%".
+#          name:
+#        # -- Selector allows resources to be implicitly considered for inclusion
+#        # in this scope or scopes.  More info:
+#        # https://kubernetes.io/docs/reference/generated/kubernetes-
+#        # api/v1.21/#labelselector-v1-meta
+#        selector:
+#          # matchExpressions is a list of label selector requirements. The
+#          # requirements are ANDed.
+#          matchExpressions:
+#            # key is the label key that the selector applies to.
+#            key:
+#            # operator represents a key's relationship to a set of values. Valid
+#            # operators are In, NotIn, Exists and DoesNotExist.
+#            operator:
+#            # values is an array of string values. If the operator is In or
+#            # NotIn, the values array must be non-empty. If the operator is
+#            # Exists or DoesNotExist, the values array must be empty. This array
+#            # is replaced during a strategic merge patch.
+#            values:
+#          # matchLabels is a map of {key,value} pairs. A single {key,value} in
+#          # the matchLabels map is equivalent to an element of matchExpressions,
+#          # whose key field is "key", the operator is "In", and the values array
+#          # contains only "value". The requirements are ANDed.
+#          matchLabels:
+
+# --  Uncomment to create a "couchbaserolebindings" resource
+rolebindings: {}
+# default:
+#   kind: CouchbaseRoleBinding
+#   # -- CouchbaseGroup being bound to subjects.
+#   roleRef:
+#     # -- Kind of role to use for binding.
+#     kind:
+#     # -- Name of role resource to use for binding.
+#     name:
+#   # -- List of users to bind a role to.
+#   subjects:
+#     # -- Couchbase user/group kind.
+#     kind:
+#     # -- Name of Couchbase user resource.
+#     name:
+
+# TLS Certs that will be used to encrypt traffic between operator and couchbase
+tls:
+  # -- Enable to auto create certs
+  generate: false
+  # -- Legacy TLS configuration with static format which requires PKCS#1 formatted keys.
+  # Legacy format is used implicitly during upgrade when old static keys exist.
+  # The default is 'false' which supports additional formats and multiple root CAs.
+  legacy: false
+  # -- Expiry time of CA in days for generated certs
+  expiration: 365
+  # -- This field defines whether node-to-node encryption is enabled.
+  # Must be either 'All' or 'ControlPlaneOnly'.
+  # If not specified, data between Couchbase Server nodes is not encrypted.
+  nodeToNodeEncryption:
+
+# syncGateway configuration
+syncGateway:
+  # -- Kind of resource to use when installing sync gateway resource.
+  # suppports (Deployment | Statefulset)
+  kind: Deployment
+  # -- Name of the sync gateway pod.
+  # defaults to name of chart
+  name:
+  # -- How many sync gateway pods to create
+  # horizontally scale the deployment
+  replicas: 1
+  # -- Optional set to change cleanup policy
+  revisionHistoryLimit:
+  # -- Labels to apply to the deployment resource
+  labels: {}
+  # -- Labels to apply to the pods
+  podLabels: {}
+  # -- Resources to apply to the pods
+  resources: {}
+  # -- Affinity to apply to the pods
+  affinity: {}
+  # -- Which nodes to run the pods on
+  nodeSelector: {}
+  # -- Tolerations are applied to pods, and allow (but do not require)
+  # the pods to schedule onto nodes with matching taints.
+  tolerations: []
+  admin:
+    # -- Defines if the admin API will be exposed by sync gateway
+    enabled: false
+  service:
+    # -- Additional annotations to add to the Sync Gateway service.
+    # Useful for setting cloud provider specific annotations controlling the services deployed.
+    annotations: {}
+    # -- Optionally configure traffic policy for LoadBalancer and NodePort
+    externalTrafficPolicy:
+  # defines integration with third party monitoring software
+  monitoring:
+    prometheus:
+      # -- Defines whether Prometheus metric collection is enabled
+      enabled: false
+      # -- Image used by the Sync Gateway to perform metric collection
+      # (injected as a "sidecar" in each Sync Gateway Pod)
+      image:
+        repository: couchbasesamples/sync-gateway-prometheus-exporter
+        tag: latest
+      # pod
+      resources: {}
+        # requests:
+        #   cpu: 100m
+        # limits:
+        #   cpu: 100m
+  # -- Database config
+  config:
+    logging:
+      console:
+        enabled: true
+        log_level: "debug"
+        log_keys:
+          - "*"
+    # -- Databases is a list containing
+    # bucket replication configs
+    databases:
+      db:
+        # -- Bucket replicated to sync gateway
+        bucket: default
+        # -- Guest user config
+        users:
+          GUEST:
+            # -- Disable creation of guest user
+            disabled: false
+            # -- Channels guest user may access.
+            # defaults to all channels
+            admin_channels: ["*"]
+        # -- Server to connect db to, defaults to cluster server
+        server:
+        # -- Username of db admin, defaults to cluster admin username
+        username:
+        # -- Password of db admin, defaults to cluster admin password
+        password:
+        allow_conflicts: false
+        revs_limit: 20
+        enable_shared_bucket_access: true
+        # -- Optional ca.cert for tls connection
+        # (auto-generated when tls.generate true)
+        cacert:
+  # -- Type of service to use for exposing Sync Gateway
+  # Set as empty string to prevent service creation
+  exposeServiceType: ClusterIP
+  # -- Image of the sync gateway container
+  image:
+    repository: couchbase/sync-gateway
+    tag: 3.0.4-enterprise
+  imagePullPolicy: IfNotPresent
+  # -- Optional secret to use with prepoulated database config
+  configSecret:
+  # -- Location within sync gateway to back with persistent volume
+  volumeMounts:
+  - name: data
+    mountPath: /dbs
+    readOnly: true
+  # -- Volume claim template to define size of persistent volumes
+  # to provide for stateful sets
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        storageClassName: default
+        resources:
+          requests:
+            storage: 1Gi
+
+# @default -- will be filled in as below
+# -- Disable default bucket creation by setting buckets.default: null. Note that
+# setting default to null can throw a warning:
+# https://github.com/helm/helm/issues/5184
+buckets:
+  # -- Name of the bucket to create. @default -- will be filled in as below
+  default:
+    # -- CompressionMode defines how Couchbase server handles document
+    # compression.  When off, documents are stored in memory, and transferred to
+    # the client uncompressed. When passive, documents are stored compressed in
+    # memory, and transferred to the client compressed when requested.  When
+    # active, documents are stored compresses in memory and when transferred to
+    # the client.  This field must be "off", "passive" or "active", defaulting
+    # to "passive".  Be aware "off" in YAML 1.2 is a boolean, so must be quoted
+    # as a string in configuration files.
+    compressionMode: passive
+    # -- ConflictResolution defines how XDCR handles concurrent write conflicts.
+    # Sequence number based resolution selects the document with the highest
+    # sequence number as the most recent. Timestamp based resolution selects the
+    # document that was written to most recently as the most recent.  This field
+    # must be "seqno" (sequence based), or "lww" (timestamp based), defaulting
+    # to "seqno".
+    conflictResolution: seqno
+    # -- EnableFlush defines whether a client can delete all documents in a
+    # bucket. This field defaults to false.
+    enableFlush: false
+    # -- EnableIndexReplica defines whether indexes for this bucket are
+    # replicated. This field defaults to false.
+    enableIndexReplica: false
+    # -- EvictionPolicy controls how Couchbase handles memory exhaustion.  Value
+    # only eviction flushes documents to disk but maintains document metadata in
+    # memory in order to improve query performance.  Full eviction removes all
+    # data from memory after the document is flushed to disk.  This field must
+    # be "valueOnly" or "fullEviction", defaulting to "valueOnly".
+    evictionPolicy: valueOnly
+    # -- IOPriority controls how many threads a bucket has, per pod, to process
+    # reads and writes. This field must be "low" or "high", defaulting to "low".
+    # Modification of this field will cause a temporary service disruption as
+    # threads are restarted.
+    ioPriority: low
+    # -- The type of the bucket to create by default. Removed from CRD as only
+    # used by Helm.
+    kind: CouchbaseBucket
+    # -- MemoryQuota is a memory limit to the size of a bucket.  When this limit
+    # is exceeded, documents will be evicted from memory to disk as defined by
+    # the eviction policy.  The memory quota is defined per Couchbase pod
+    # running the data service.  This field defaults to, and must be greater
+    # than or equal to 100Mi.  More info:
+    # https://kubernetes.io/docs/concepts/configuration/manage-resources-
+    # containers/#resource-units-in-kubernetes
+    memoryQuota: 100Mi
+    # -- Replicas defines how many copies of documents Couchbase server
+    # maintains.  This directly affects how fault tolerant a Couchbase cluster
+    # is.  With a single replica, the cluster can tolerate one data pod going
+    # down and still service requests without data loss.  The number of replicas
+    # also affect memory use.  With a single replica, the effective memory quota
+    # for documents is halved, with two replicas it is one third.  The number of
+    # replicas must be between 0 and 3, defaulting to 1.
+    replicas: 1
+    # -- Scopes defines whether the Operator manages scopes for the bucket or
+    # not, and the set of scopes defined for the bucket.
+    scopes:
+      # -- Managed defines whether scopes are managed for this bucket. This
+      # field is `false` by default, and the Operator will take no actions that
+      # will affect scopes and collections in this bucket.  The default scope
+      # and collection will be present.  When set to `true`, the Operator will
+      # manage user defined scopes, and optionally, their collections as defined
+      # by the `CouchbaseScope`, `CouchbaseScopeGroup`, `CouchbaseCollection`
+      # and `CouchbaseCollectionGroup` resource documentation.  If this field is
+      # set to `false` while the  already managed, then the Operator will leave
+      # whatever configuration is already present.
+      managed: false
+      # -- Resources is an explicit list of named resources that will be
+      # considered for inclusion in this bucket.  If a resource reference
+      # doesn't match a resource, then no error conditions are raised due to
+      # undefined resource creation ordering and eventual consistency.
+      resources: []
+    # -- StorageBackend to be assigned to and used by the bucket. Only valid for
+    # Couchbase Server 7.0.0 onward. Two different backend storage mechanisms
+    # can be used - "couchstore" or "magma", defaulting to "couchstore". This
+    # cannot be edited after bucket creation. Note: "magma" is only valid for
+    # Couchbase Server 7.1.0 onward.
+    storageBackend: couchstore
+
+# @default -- will be filled in as below
+# -- Controls the generation of the CouchbaseCluster CRD
+cluster:
+  # -- AntiAffinity forces the Operator to schedule different Couchbase server
+  # pods on different Kubernetes nodes.  Anti-affinity reduces the likelihood of
+  # unrecoverable failure in the event of a node issue.  Use of anti-affinity is
+  # highly recommended for production clusters.
+  antiAffinity: false
+  # -- AutoResourceAllocation populates pod resource requests based on the
+  # services running on that pod.  When enabled, this feature will calculate the
+  # memory request as the total of service allocations defined in
+  # `spec.cluster`, plus an overhead defined by
+  # `spec.autoResourceAllocation.overheadPercent`.Changing individual
+  # allocations for a service will cause a cluster upgrade as allocations are
+  # modified in the underlying pods.  This field also allows default pod CPU
+  # requests and limits to be applied. All resource allocations can be
+  # overridden by explicitly configuring them in the `spec.servers.resources`
+  # field.
+  autoResourceAllocation:
+    # -- CPULimits automatically populates the CPU limits across all Couchbase
+    # server pods.  This field defaults to "4" CPUs.  Explicitly specifying the
+    # CPU limit for a particular server class will override this value.  More
+    # info: https://kubernetes.io/docs/concepts/configuration/manage-resources-
+    # containers/#resource-units-in-kubernetes
+    cpuLimits: '4'
+    # -- CPURequests automatically populates the CPU requests across all
+    # Couchbase server pods.  The default value of "2", is the minimum
+    # recommended number of CPUs required to run Couchbase Server.  Explicitly
+    # specifying the CPU request for a particular server class will override
+    # this value. More info:
+    # https://kubernetes.io/docs/concepts/configuration/manage-resources-
+    # containers/#resource-units-in-kubernetes
+    cpuRequests: '2'
+    # -- Enabled defines whether auto-resource allocation is enabled.
+    enabled: false
+    # -- OverheadPercent defines the amount of memory above that required for
+    # individual services on a pod.  For Couchbase Server this should be
+    # approximately 25%.
+    overheadPercent: 25
+  # -- Backup defines whether the Operator should manage automated backups, and
+  # how to lookup backup resources.  Refer to the documentation for supported
+  # values https://docs.couchbase.com/operator/current/howto-backup.html#enable-
+  # automated-backup
+  backup:
+    # -- The Backup Image to run on backup pods.
+    image: couchbase/operator-backup:1.3.5
+    # -- Managed defines whether backups are managed by us or the clients.
+    managed: true
+    # -- Deprecated: by CouchbaseBackup.spec.objectStore.Endpoint ObjectEndpoint
+    # contains the configuration for connecting to a custom S3 compliant object
+    # store.
+    objectEndpoint:
+      # -- UseVirtualPath will force the AWS SDK to use the new virtual style
+      # paths which are often required by S3 compatible object stores.
+      useVirtualPath: false
+    # -- The Service Account to run backup (and restore) pods under. Without
+    # this backup pods will not be able to update status.
+    serviceAccountName: couchbase-backup
+    # -- Deprecated: by CouchbaseBackup.spec.objectStore.useIAM UseIAMRole
+    # enables backup to fetch EC2 instance metadata. This allows the AWS SDK to
+    # use the EC2's IAM Role for S3 access. UseIAMRole will ignore credentials
+    # in s3Secret.
+    useIAMRole: false
+  # -- Buckets defines whether the Operator should manage buckets, and how to
+  # lookup bucket resources.
+  buckets:
+    # -- Managed defines whether buckets are managed by the Operator (true), or
+    # user managed (false). When Operator managed, all buckets must be defined
+    # with either CouchbaseBucket, CouchbaseEphemeralBucket or
+    # CouchbaseMemcachedBucket resources.  Manual addition of buckets will be
+    # reverted by the Operator.  When user managed, the Operator will not
+    # interrogate buckets at all.  This field defaults to false.
+    managed: true
+    # -- Synchronize allows unmanaged buckets, scopes, and collections to be
+    # synchronized as Kubernetes resources by the Operator.  This feature is
+    # intended for development only and should not be used for production
+    # workloads.  The synchronization workflow starts with
+    # `spec.buckets.managed` being set to false, the user can manually create
+    # buckets, scopes, and collections using the Couchbase UI, or other tooling.
+    # When you wish to commit to Kubernetes resources, you must specify a unique
+    # label selector in the `spec.buckets.selector` field, and this field is set
+    # to true.  The Operator will create Kubernetes resources for you, and upon
+    # completion set the cluster's `Synchronized` status condition.  You may
+    # then safely set `spec.buckets.managed` to true and the Operator will
+    # manage these resources as per usual.  To update an already managed data
+    # topology, you must first set it to unmanaged, make any changes, and delete
+    # any old resources, then follow the standard synchronization workflow.  The
+    # Operator can not, and will not, ever delete, or make modifications to
+    # resource specifications that are intended to be user managed, or managed
+    # by a life cycle management tool. These actions must be instigated by an
+    # end user.  For a more complete experience, refer to the documentation for
+    # the `cao save` and `cao restore` CLI commands.
+    synchronize: false
+  # -- ClusterSettings define Couchbase cluster-wide settings such as memory
+  # allocation, failover characteristics and index settings.
+  cluster:
+    # -- AnalyticsServiceMemQuota is the amount of memory that should be
+    # allocated to the analytics service. This value is per-pod, and only
+    # applicable to pods belonging to server classes running the analytics
+    # service.  This field must be a quantity greater than or equal to 1Gi.
+    # This field defaults to 1Gi.  More info:
+    # https://kubernetes.io/docs/concepts/configuration/manage-resources-
+    # containers/#resource-units-in-kubernetes
+    analyticsServiceMemoryQuota: 1Gi
+    # -- AutoCompaction allows the configuration of auto-compaction, including
+    # on what conditions disk space is reclaimed and when it is allowed to run.
+    autoCompaction:
+      # -- DatabaseFragmentationThreshold defines triggers for when database
+      # compaction should start.
+      databaseFragmentationThreshold:
+        # Percent is the percentage of disk fragmentation after which to
+        # decompaction will be triggered. This field must be in the range 2-100,
+        # defaulting to 30.
+        percent: 30
+      # -- ParallelCompaction controls whether database and view compactions can
+      # happen in parallel.
+      parallelCompaction: false
+      # -- TimeWindow allows restriction of when compaction can occur.
+      timeWindow:
+        # AbortCompactionOutsideWindow stops compaction processes when the
+        # process moves outside the window.
+        abortCompactionOutsideWindow: false
+      # -- TombstonePurgeInterval controls how long to wait before purging
+      # tombstones. This field must be in the range 1h-1440h, defaulting to 72h.
+      # More info:  https://golang.org/pkg/time/#ParseDuration
+      tombstonePurgeInterval: 72h
+      # -- ViewFragmentationThreshold defines triggers for when view compaction
+      # should start.
+      viewFragmentationThreshold:
+        # Percent is the percentage of disk fragmentation after which to
+        # decompaction will be triggered. This field must be in the range 2-100,
+        # defaulting to 30.
+        percent: 30
+    # -- AutoFailoverMaxCount is the maximum number of automatic failovers
+    # Couchbase server will allow before not allowing any more.  This field must
+    # be between 1-3 for server versions prior to 7.1.0 default is 1.
+    autoFailoverMaxCount: 1
+    # -- AutoFailoverOnDataDiskIssues defines whether Couchbase server should
+    # failover a pod if a disk issue was detected.
+    autoFailoverOnDataDiskIssues: false
+    # -- AutoFailoverOnDataDiskIssuesTimePeriod defines how long to wait for
+    # transient errors before failing over a faulty disk.  This field must be in
+    # the range 5-3600s, defaulting to 120s.  More info:
+    # https://golang.org/pkg/time/#ParseDuration
+    autoFailoverOnDataDiskIssuesTimePeriod: 120s
+    # -- AutoFailoverServerGroup whether to enable failing over a server group.
+    # This field is ignored in server versions 7.1+ as it has been removed from
+    # the Couchbase API
+    autoFailoverServerGroup: false
+    # -- AutoFailoverTimeout defines how long Couchbase server will wait between
+    # a pod being witnessed as down, until when it will failover the pod.
+    # Couchbase server will only failover pods if it deems it safe to do so, and
+    # not result in data loss.  This field must be in the range 5-3600s,
+    # defaulting to 120s. More info:  https://golang.org/pkg/time/#ParseDuration
+    autoFailoverTimeout: 120s
+    # -- DataServiceMemQuota is the amount of memory that should be allocated to
+    # the data service. This value is per-pod, and only applicable to pods
+    # belonging to server classes running the data service.  This field must be
+    # a quantity greater than or equal to 256Mi.  This field defaults to 256Mi.
+    # More info: https://kubernetes.io/docs/concepts/configuration/manage-
+    # resources-containers/#resource-units-in-kubernetes
+    dataServiceMemoryQuota: 256Mi
+    # -- EventingServiceMemQuota is the amount of memory that should be
+    # allocated to the eventing service. This value is per-pod, and only
+    # applicable to pods belonging to server classes running the eventing
+    # service.  This field must be a quantity greater than or equal to 256Mi.
+    # This field defaults to 256Mi.  More info:
+    # https://kubernetes.io/docs/concepts/configuration/manage-resources-
+    # containers/#resource-units-in-kubernetes
+    eventingServiceMemoryQuota: 256Mi
+    # -- IndexServiceMemQuota is the amount of memory that should be allocated
+    # to the index service. This value is per-pod, and only applicable to pods
+    # belonging to server classes running the index service.  This field must be
+    # a quantity greater than or equal to 256Mi.  This field defaults to 256Mi.
+    # More info: https://kubernetes.io/docs/concepts/configuration/manage-
+    # resources-containers/#resource-units-in-kubernetes
+    indexServiceMemoryQuota: 256Mi
+    # -- DEPRECATED - by indexer. The index storage mode to use for secondary
+    # indexing.  This field must be one of "memory_optimized" or "plasma",
+    # defaulting to "memory_optimized".  This field is immutable and cannot be
+    # changed unless there are no server classes running the index service in
+    # the cluster.
+    indexStorageSetting: memory_optimized
+    # -- Indexer allows the indexer to be configured.
+    indexer:
+      # -- LogLevel controls the verbosity of indexer logs.  This field must be
+      # one of "silent", "fatal", "error", "warn", "info", "verbose", "timing",
+      # "debug" or "trace", defaulting to "info".
+      logLevel: info
+      # -- MaxRollbackPoints controls the number of checkpoints that can be
+      # rolled back to.  The default is 2, with a minimum of 1.
+      maxRollbackPoints: 2
+      # -- MemorySnapshotInterval controls when memory indexes should be
+      # snapshotted. This defaults to 200ms, and must be greater than or equal
+      # to 1ms.
+      memorySnapshotInterval: 200ms
+      # -- NumberOfReplica specifies number of secondary index replicas to be
+      # created by the Index Service whenever CREATE INDEX is invoked, which
+      # ensures high availability and high performance. Note, if nodes and
+      # num_replica are both specified in the WITH clause, the specified number
+      # of nodes must be one greater than num_replica This defaults to 0, which
+      # means no index replicas to be created by default. Minimum must be 0.
+      numReplica: 0
+      # -- RedistributeIndexes when true, Couchbase Server redistributes indexes
+      # when rebalance occurs, in order to optimize performance. If false (the
+      # default), such redistribution does not occur.
+      redistributeIndexes: false
+      # -- StableSnapshotInterval controls when disk indexes should be
+      # snapshotted. This defaults to 5s, and must be greater than or equal to
+      # 1ms.
+      stableSnapshotInterval: 5s
+      # -- StorageMode controls the underlying storage engine for indexes.  Once
+      # set it can only be modified if there are no nodes in the cluster running
+      # the index service.  The field must be one of "memory_optimized" or
+      # "plasma", defaulting to "memory_optimized".
+      storageMode: memory_optimized
+    # -- Query allows the query service to be configured.
+    query:
+      # -- BackfillEnabled allows the query service to backfill.
+      backfillEnabled: true
+      # -- TemporarySpace allows the temporary storage used by the query service
+      # backfill, per-pod, to be modified.  This field requires
+      # `backfillEnabled` to be set to true in order to have any effect. More
+      # info: https://kubernetes.io/docs/concepts/configuration/manage-
+      # resources-containers/#resource-units-in-kubernetes
+      temporarySpace: 5Gi
+      # -- TemporarySpaceUnlimited allows the temporary storage used by the
+      # query service backfill, per-pod, to be unconstrained.  This field
+      # requires `backfillEnabled` to be set to true in order to have any
+      # effect. This field overrides `temporarySpace`.
+      temporarySpaceUnlimited: false
+    # -- SearchServiceMemQuota is the amount of memory that should be allocated
+    # to the search service. This value is per-pod, and only applicable to pods
+    # belonging to server classes running the search service.  This field must
+    # be a quantity greater than or equal to 256Mi.  This field defaults to
+    # 256Mi.  More info:
+    # https://kubernetes.io/docs/concepts/configuration/manage-resources-
+    # containers/#resource-units-in-kubernetes
+    searchServiceMemoryQuota: 256Mi
+  # -- EnableOnlineVolumeExpansion enables online expansion of Persistent
+  # Volumes. You can only expand a PVC if its storage class's
+  # "allowVolumeExpansion" field is set to true. Additionally, Kubernetes
+  # feature "ExpandInUsePersistentVolumes" must be enabled in order to expand
+  # the volumes which are actively bound to Pods. Volumes can only be expanded
+  # and not reduced to a smaller size. See:
+  # https://kubernetes.io/docs/concepts/storage/persistent-volumes/#resizing-an-
+  # in-use-persistentvolumeclaim   If "EnableOnlineVolumeExpansion" is enabled
+  # for use within an environment that does not actually support online volume
+  # and file system expansion then the cluster will fallback to rolling upgrade
+  # procedure to create a new set of Pods for use with resized Volumes. More
+  # info:  https://kubernetes.io/docs/concepts/storage/persistent-
+  # volumes/#expanding-persistent-volumes-claims
+  enableOnlineVolumeExpansion: false
+  # -- DEPRECATED - This option only exists for backwards compatibility and no
+  # longer restricts autoscaling to ephemeral services. EnablePreviewScaling
+  # enables autoscaling for stateful services and buckets.
+  enablePreviewScaling: false
+  # -- EnvImagePrecedence gives precedence over the default container image name
+  # in `spec.Image` to an image name provided through Operator environment
+  # variables. For more info on using Operator environment variables:
+  # https://docs.couchbase.com/operator/current/reference-operator-
+  # configuration.html
+  envImagePrecedence: false
+  # -- Hibernate is whether to hibernate the cluster.
+  hibernate: false
+  image: couchbase/server:7.2.0
+  # -- Logging defines Operator logging options.
+  logging:
+    # -- Used to manage the audit configuration directly
+    audit:
+      # -- Enabled is a boolean that enables the audit capabilities.
+      enabled: false
+      # -- Handle all optional garbage collection (GC) configuration for the
+      # audit functionality. This is not part of the audit REST API, it is
+      # intended to handle GC automatically for the audit logs. By default the
+      # Couchbase Server rotates the audit logs but does not clean up the
+      # rotated logs. This is left as an operation for the cluster administrator
+      # to manage, the operator allows for us to automate this:
+      # https://docs.couchbase.com/server/current/manage/manage-security/manage-
+      # auditing.html
+      garbageCollection:
+        # Provide the sidecar configuration required (if so desired) to
+        # automatically clean up audit logs.
+        sidecar:
+          # The minimum age of rotated log files to remove, defaults to one
+          # hour.
+          age: 1h
+          # Enable this sidecar by setting to true, defaults to being disabled.
+          enabled: false
+          # Image is the image to be used to run the audit sidecar helper. No
+          # validation is carried out as this can be any arbitrary repo and tag.
+          image: busybox:1.33.1
+          # The interval at which to check for rotated log files to remove,
+          # defaults to 20 minutes.
+          interval: 20m
+      # -- The interval to optionally rotate the audit log. This is passed to
+      # the REST API, see here for details:
+      # https://docs.couchbase.com/server/current/manage/manage-security/manage-
+      # auditing.html
+      rotation:
+        # The interval at which to rotate log files, defaults to 15 minutes.
+        interval: 15m
+        # Size allows the specification of a rotation size for the log, defaults
+        # to 20Mi. More info:
+        # https://kubernetes.io/docs/concepts/configuration/manage-resources-
+        # containers/#resource-units-in-kubernetes
+        size: 20Mi
+    # -- Specification of all logging configuration required to manage the
+    # sidecar containers in each pod.
+    server:
+      # -- ConfigurationName is the name of the Secret to use holding the
+      # logging configuration in the namespace. A Secret is used to ensure we
+      # can safely store credentials but this can be populated from plaintext if
+      # acceptable too. If it does not exist then one will be created with
+      # defaults in the namespace so it can be easily updated whilst running.
+      # Note that if running multiple clusters in the same kubernetes namespace
+      # then you should use a separate Secret for each, otherwise the first
+      # cluster will take ownership (if created) and the Secret will be cleaned
+      # up when that cluster is removed. If running clusters in separate
+      # namespaces then they will be separate Secrets anyway.
+      configurationName: fluent-bit-config
+      # -- Enabled is a boolean that enables the logging sidecar container.
+      enabled: false
+      # -- A boolean which indicates whether the operator should manage the
+      # configuration or not. If omitted then this defaults to true which means
+      # the operator will attempt to reconcile it to default values. To use a
+      # custom configuration make sure to set this to false. Note that the
+      # ownership of any Secret is not changed so if a Secret is created
+      # externally it can be updated by the operator but it's ownership stays
+      # the same so it will be cleaned up when it's owner is.
+      manageConfiguration: true
+      # -- Any specific logging sidecar container configuration.
+      sidecar:
+        # ConfigurationMountPath is the location to mount the ConfigurationName
+        # Secret into the image. If another log shipping image is used that
+        # needs a different mount then modify this. Note that the configuration
+        # file must be called 'fluent-bit.conf' at the root of this path, there
+        # is no provision for overriding the name of the config file passed as
+        # the COUCHBASE_LOGS_CONFIG_FILE environment variable.
+        configurationMountPath: /fluent-bit/config/
+        # Image is the image to be used to deal with logging as a sidecar. No
+        # validation is carried out as this can be any arbitrary repo and tag.
+        # It will default to the latest supported version of Fluent Bit.
+        image: couchbase/fluent-bit:1.2.1
+  # -- Monitoring defines any Operator managed integration into 3rd party
+  # monitoring infrastructure.
+  monitoring: {}
+  # -- Name of the cluster, defaults to name of chart release
+  name:
+  # -- Networking defines Couchbase cluster networking options such as network
+  # topology, TLS and DDNS settings.
+  networking:
+    # -- AdminConsoleServiceTemplate provides a template used by the Operator to
+    # create and manage the admin console service.  This allows services to be
+    # annotated, the service type defined and any other options that Kubernetes
+    # provides.  When using a LoadBalancer service type, TLS and dynamic DNS
+    # must also be enabled. The Operator reserves the right to modify or replace
+    # any field.  More info:
+    # https://kubernetes.io/docs/reference/generated/kubernetes-
+    # api/v1.21/#service-v1-core
+    adminConsoleServiceTemplate:
+      # -- ServiceSpec describes the attributes that a user creates on a
+      # service.
+      spec:
+        type: NodePort
+    adminConsoleServices:
+    - data
+    # -- DisableUIOverHTTP is used to explicitly enable and disable UI access
+    # over the HTTP protocol.  If not specified, this field defaults to false.
+    disableUIOverHTTP: false
+    # -- DisableUIOverHTTPS is used to explicitly enable and disable UI access
+    # over the HTTPS protocol.  If not specified, this field defaults to false.
+    disableUIOverHTTPS: false
+    # -- ExposeAdminConsole creates a service referencing the admin console. The
+    # service is configured by the adminConsoleServiceTemplate field.
+    exposeAdminConsole: true
+    # -- ExposedFeatureServiceTemplate provides a template used by the Operator
+    # to create and manage per-pod services.  This allows services to be
+    # annotated, the service type defined and any other options that Kubernetes
+    # provides.  When using a LoadBalancer service type, TLS and dynamic DNS
+    # must also be enabled. The Operator reserves the right to modify or replace
+    # any field.  More info:
+    # https://kubernetes.io/docs/reference/generated/kubernetes-
+    # api/v1.21/#service-v1-core
+    exposedFeatureServiceTemplate:
+      # -- ServiceSpec describes the attributes that a user creates on a
+      # service.
+      spec:
+        type: NodePort
+    exposedFeatures:
+    - client
+    - xdcr
+    # -- WaitForAddressReachable is used to set the timeout between when polling
+    # of external addresses is started, and when it is deemed a failure.
+    # Polling of DNS name availability inherently dangerous due to negative
+    # caching, so prefer the use of an initial `waitForAddressReachableDelay` to
+    # allow propagation.
+    waitForAddressReachable: 10m
+    # -- WaitForAddressReachableDelay is used to defer operator checks that
+    # ensure external addresses are reachable before new nodes are balanced in
+    # to the cluster.  This prevents negative DNS caching while waiting for
+    # external-DDNS controllers to propagate addresses.
+    waitForAddressReachableDelay: 2m
+  # -- Paused is to pause the control of the operator for the Couchbase cluster.
+  # This does not pause the cluster itself, instead stopping the operator from
+  # taking any action.
+  paused: false
+  # -- Security defines Couchbase cluster security options such as the
+  # administrator account username and password, and user RBAC settings.
+  security:
+    adminSecret: ''
+    # -- Cluster administrator pasword, auto-generated when empty
+    password: ''
+    # -- PodSecurityContext allows the configuration of the security context for
+    # all Couchbase server pods.  When using persistent volumes you may need to
+    # set the fsGroup field in order to write to the volume.  For non-root
+    # clusters you must also set runAsUser to 1000, corresponding to the
+    # Couchbase user in official container images.  More info:
+    # https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+    podSecurityContext:
+      fsGroup: 1000
+      # -- Indicates that the container must run as a non-root user. If true,
+      # the Kubelet will validate the image at runtime to ensure that it does
+      # not run as UID 0 (root) and fail to start the container if it does. If
+      # unset or false, no such validation will be performed. May also be set in
+      # SecurityContext.  If set in both SecurityContext and PodSecurityContext,
+      # the value specified in SecurityContext takes precedence.
+      runAsNonRoot: true
+      runAsUser: 1000
+      # -- The Windows specific settings applied to all containers. If
+      # unspecified, the options within a container's SecurityContext will be
+      # used. If set in both SecurityContext and PodSecurityContext, the value
+      # specified in SecurityContext takes precedence. Note that this field
+      # cannot be set when spec.os.name is linux.
+      windowsOptions:
+        # HostProcess determines if a container should be run as a 'Host
+        # Process' container. This field is alpha-level and will only be honored
+        # by components that enable the WindowsHostProcessContainers feature
+        # flag. Setting this field without the feature flag will result in
+        # errors when validating the Pod. All of a Pod's containers must have
+        # the same effective HostProcess value (it is not allowed to have a mix
+        # of HostProcess containers and non-HostProcess containers).  In
+        # addition, if HostProcess is true then HostNetwork must also be set to
+        # true.
+        hostProcess: false
+    # -- RBAC is the options provided for enabling and selecting RBAC User
+    # resources to manage.
+    rbac:
+      # -- Managed defines whether RBAC is managed by us or the clients.
+      managed: true
+    # -- SecurityContext defines the security options the container should be
+    # run with. If set, the fields of SecurityContext override the equivalent
+    # fields of PodSecurityContext. Use securityContext.allowPrivilegeEscalation
+    # field to grant more privileges than its parent process. More info:
+    # https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+    securityContext:
+      # -- AllowPrivilegeEscalation controls whether a process can gain more
+      # privileges than its parent process. This bool directly controls if the
+      # no_new_privs flag will be set on the container process.
+      # AllowPrivilegeEscalation is true always when the container is: 1) run as
+      # Privileged 2) has CAP_SYS_ADMIN Note that this field cannot be set when
+      # spec.os.name is windows.
+      allowPrivilegeEscalation: false
+    # -- UISessionTimeout sets how long, in minutes, before a user is declared
+    # inactive and signed out from the Couchbase Server UI. 0 represents no time
+    # out.
+    uiSessionTimeout: 0
+    # -- Cluster administrator username
+    username: Administrator
+  # -- Servers defines server classes for the Operator to provision and manage.
+  # A server class defines what services are running and how many members make
+  # up that class.  Specifying multiple server classes allows the Operator to
+  # provision clusters with Multi-Dimensional Scaling (MDS).  At least one
+  # server class must be defined, and at least one server class must be running
+  # the data service.
+  servers:
+    # -- Name for the server configuration. It must be unique.
+    default:
+      # -- AutoscaledEnabled defines whether the autoscaling feature is enabled
+      # for this class. When true, the Operator will create a
+      # CouchbaseAutoscaler resource for this server class.  The
+      # CouchbaseAutoscaler implements the Kubernetes scale API and can be
+      # controlled by the Kubernetes horizontal pod autoscaler (HPA).
+      autoscaleEnabled: false
+      # -- Env allows the setting of environment variables in the Couchbase
+      # server container.
+      env: []
+      # -- EnvFrom allows the setting of environment variables in the Couchbase
+      # server container.
+      envFrom: []
+      # -- Pod defines a template used to create pod for each Couchbase server
+      # instance.  Modifying pod metadata such as labels and annotations will
+      # update the pod in-place.  Any other modification will result in a
+      # cluster upgrade in order to fulfill the request. The Operator reserves
+      # the right to modify or replace any field.  More info:
+      # https://kubernetes.io/docs/reference/generated/kubernetes-
+      # api/v1.21/#pod-v1-core
+      pod:
+        spec: {}
+      services:
+      - data
+      - index
+      - query
+      - search
+      - analytics
+      - eventing
+      size: 4
+  # -- SoftwareUpdateNotifications enables software update notifications in the
+  # UI. When enabled, the UI will alert when a Couchbase server upgrade is
+  # available.
+  softwareUpdateNotifications: true
+  # -- XDCR defines whether the Operator should manage XDCR, remote clusters and
+  # how to lookup replication resources.
+  xdcr:
+    # -- Managed defines whether XDCR is managed by the operator or not.
+    managed: false
+
+

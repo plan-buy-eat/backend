@@ -1186,11 +1186,11 @@ cluster:
       - search
       - analytics
       - eventing
-      size: 3
+      size: 4
   # -- SoftwareUpdateNotifications enables software update notifications in the
   # UI. When enabled, the UI will alert when a Couchbase server upgrade is
   # available.
-  softwareUpdateNotifications: false
+  softwareUpdateNotifications: true
   # -- XDCR defines whether the Operator should manage XDCR, remote clusters and
   # how to lookup replication resources.
   xdcr:

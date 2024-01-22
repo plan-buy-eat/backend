@@ -5,3 +5,4 @@ COUCHBASE_BUCKET: default
 SERVICE_VERSION: latest
 DEBUG: false
 SERVICE_NAME: user-service
+REPLICAS: 3

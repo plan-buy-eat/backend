@@ -6,7 +6,7 @@ metadata:
     app: {{ .Values.SERVICE_NAME }}
   name: {{ .Values.SERVICE_NAME }}
 spec:
-  replicas: 3
+  replicas: {{ .Values.REPLICAS }}
   selector:
     matchLabels:
       app: {{ .Values.SERVICE_NAME }}

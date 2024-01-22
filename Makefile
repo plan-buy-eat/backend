@@ -177,7 +177,7 @@ install-couchbase:
 #	helm repo update
 #	helm install couchbase --set cluster.name=couchbase --values devops/couchbase/values.yaml --set tls.generate=true couchbase/couchbase-operator
 #	helm install couchbase --set cluster.name=couchbase --values devops/couchbase/values.yaml --set tls.generate=true ./devops/couchbase/couchbase-operator
-	helm install couchbase --set cluster.name=couchbase --values devops/couchbase/values.yaml --set tls.generate=true --namespace couchbase --create-namespace ./devops/couchbase/couchbase-operator
+	helm upgrade --install couchbase --set cluster.name=couchbase --values devops/couchbase/values.yaml --set tls.generate=true --namespace couchbase --create-namespace ./devops/couchbase/couchbase-operator
 
 .PHONY: uninstall-couchbase
 uninstall-couchbase:
