@@ -63,7 +63,8 @@ func (h *genericHandler) err(c *gin.Context, message string, err error) {
 func (h *genericHandler) errWithStatus(c *gin.Context, status int, message string, err error) {
 	err = c.AbortWithError(status, fmt.Errorf("%s: %w", message, err))
 	if err != nil {
-		log.Logger().Fatal().Err(err).Msg("error aborting with error")
+		log.Logger().Error().Err(err).Msg("error aborting with error")
+		c.Status(500)
 	}
 }
 

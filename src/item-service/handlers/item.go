@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/shoppinglist/config"
 	"github.com/shoppinglist/db"
+	"github.com/shoppinglist/log"
 	"github.com/shoppinglist/models"
 	"net/http"
 	"strconv"
@@ -127,6 +128,8 @@ type PaginationQuery struct {
 
 func (h *itemHandler) GetItems(c *gin.Context) {
 	ctx := c.Request.Context()
+
+	log.Logger().Info().Any("env", c.Request.URL).Msgf("Env")
 
 	var p PaginationQuery
 	if err := c.ShouldBindQuery(&p); err != nil {

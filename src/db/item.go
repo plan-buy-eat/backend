@@ -8,6 +8,7 @@ import (
 	"github.com/rs/xid"
 	"github.com/shoppinglist/log"
 	"github.com/shoppinglist/models"
+	"strings"
 	"time"
 )
 
@@ -105,6 +106,9 @@ func (d *db) BuyItem(ctx context.Context, id string, bought bool) (err error) {
 }
 
 func (d *db) GetItems(ctx context.Context, q *PaginationQuery, searchQuery string) (items []*models.ItemWithID, total int, err error) {
+
+	searchQuery = strings.TrimSpace(searchQuery)
+
 	query := "SELECT meta(x).id, x.* FROM items x WHERE 1=1"
 	queryTotal := "SELECT COUNT(*) as total FROM items x WHERE 1=1"
 
