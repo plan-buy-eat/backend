@@ -1,6 +1,7 @@
 package config
 
 import (
+	"github.com/shoppinglist/log"
 	"os"
 	"sync"
 )
@@ -22,10 +23,14 @@ func Get() *Config {
 		return instance
 	}
 
+	hostname, err := os.Hostname()
+	if err != nil {
+		log.Logger().Fatal().Err(err).Msg("getting hostname")
+	}
 	instance = &Config{
 		ServiceName:    getValue("SERVICE_NAME", ""),
-		HostName:       getValue("HOSTNAME", "localhost"),
-		ServiceVersion: getValue("SERVICE_VERSION", ""),
+		HostName:       getValue("HOSTNAME", hostname),
+		ServiceVersion: getValue("SERVICE_VERSION", "0.0"),
 		Port:           getValue("PORT", "80"),
 	}
 
