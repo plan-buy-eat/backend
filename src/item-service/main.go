@@ -5,8 +5,13 @@ import (
 	"database/sql"
 	"errors"
 	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/logger"
+	"github.com/gin-contrib/pprof"
+	"github.com/gin-contrib/requestid"
 	"github.com/gin-gonic/gin"
 	_ "github.com/joho/godotenv/autoload"
+	"github.com/rs/xid"
+	"github.com/rs/zerolog"
 	"github.com/shoppinglist/config"
 	"github.com/shoppinglist/item-service/handlers"
 	"github.com/shoppinglist/log"
@@ -38,36 +43,51 @@ func main() {
 	listenAddress := "0.0.0.0:" + port
 	log.Logger().Printf("Listening at %s", listenAddress)
 
-	router := gin.Default()
-	router.HandleMethodNotAllowed = true
-	router.Use(cors.New(cors.Config{
+	r := gin.New()
+	pprof.Register(r)
+	r.HandleMethodNotAllowed = true
+	r.Use(logger.SetLogger(
+		logger.WithLogger(func(_ *gin.Context, l zerolog.Logger) zerolog.Logger {
+			return l.Output(gin.DefaultWriter).With().Logger()
+		}),
+	))
+	r.Use(gin.Recovery())
+	r.Use(
+		requestid.New(
+			requestid.WithGenerator(func() string {
+				return xid.New().String()
+			}),
+		),
+	)
+	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:5173", "https://shoppinglist.turevskiy.kharkiv.ua"},
 		AllowMethods:     []string{"*"},
 		AllowHeaders:     []string{"*"},
-		ExposeHeaders:    []string{"Content-Length", "Content-Type", "X-Total-Count"},
+		ExposeHeaders:    []string{"*"},
 		AllowCredentials: true,
 		//AllowOriginFunc: func(origin string) bool {
 		//	return origin == "https://github.com"
 		//},
 		MaxAge: 12 * time.Hour,
 	}))
-	router.Use(ErrorHandler())
-	router.NoRoute(func(c *gin.Context) {
+	r.Use(ErrorHandler())
+
+	r.NoRoute(func(c *gin.Context) {
 		c.JSON(http.StatusNotFound, "Page not found")
 	})
-	router.NoMethod(func(c *gin.Context) {
+	r.NoMethod(func(c *gin.Context) {
 		c.JSON(http.StatusMethodNotAllowed, "Method not found")
 	})
 
 	genericHandler := handlers.NewGenericHandler()
-	router.GET("/init", genericHandler.Init)
-	router.GET("/healthz", genericHandler.HealthZ)
+	r.GET("/init", genericHandler.Init)
+	r.GET("/healthz", genericHandler.HealthZ)
 
 	toBuyHandler := handlers.NewItemHandler(sql.NullBool{
 		Bool:  false,
 		Valid: true,
 	})
-	toBuy := router.Group("/tobuy")
+	toBuy := r.Group("/tobuy")
 	toBuy.GET("", toBuyHandler.GetItems)
 	toBuy.GET("/:id", toBuyHandler.GetItem)
 	toBuy.DELETE("/:id", toBuyHandler.BuyItem)
@@ -76,14 +96,14 @@ func main() {
 		Bool:  true,
 		Valid: true,
 	})
-	bought := router.Group("/bought")
+	bought := r.Group("/bought")
 	bought.GET("", boughtHandler.GetItems)
 	bought.GET("/:id", boughtHandler.GetItem)
 	bought.DELETE("/:id", boughtHandler.RestoreItem)
 
 	srv := &http.Server{
 		Addr:    listenAddress,
-		Handler: router,
+		Handler: r,
 	}
 
 	go func() {
@@ -101,17 +121,17 @@ func main() {
 	// kill -9 is syscall. SIGKILL but can"t be caught, so don't need to add it
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	log.Logger().Info().Msg("Shutdown Server ...")
+	log.Logger().Info().Msg("shutting down server...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Logger().Fatal().Err(err).Msg("Server Shutdown")
+		log.Logger().Fatal().Err(err).Msg("server shutdown")
 	}
 	// catching ctx.Done(). timeout of 5 seconds.
 	select {
 	case <-ctx.Done():
 		log.Logger().Info().Msg("timeout of 5 seconds.")
 	}
-	log.Logger().Info().Msg("Server exiting")
+	log.Logger().Info().Msg("server is stopped")
 }
