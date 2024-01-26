@@ -17,16 +17,11 @@ import (
 	"github.com/shoppinglist/item-service/handlers"
 	"github.com/shoppinglist/log"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/propagation"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
-
-	stdout "go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
 func ErrorHandler() gin.HandlerFunc {
@@ -34,7 +29,7 @@ func ErrorHandler() gin.HandlerFunc {
 		c.Status(http.StatusOK)
 		c.Next()
 		for _, err := range c.Errors {
-			log.Logger().Err(err).Msg("Error getting db")
+			log.Logger().Err(err).Msg("error while processing request")
 		}
 		if len(c.Errors) > 0 && c.Writer.Status() == http.StatusOK {
 			c.JSON(http.StatusInternalServerError, "Internal Server Error")
@@ -46,18 +41,23 @@ func main() {
 	// zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	// log.Logger().Info().Any("env", os.Environ()).Msgf("Env")
 
+	//// Handle SIGINT (CTRL+C) gracefully.
+	//ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	//defer stop()
+	ctx := context.Background()
+
 	c := config.Get()
 	t := fmt.Sprintf("%s(%s)@%s: %s\n", c.ServiceName, c.HostName, c.ServiceVersion, time.Now().Local().Format(time.RFC1123Z))
 	log.Logger().Info().Msgf("Starting %s\n", t)
 
-	tp, err := initTracer()
+	// Set up OpenTelemetry.
+	otelShutdown, err := setupOTelSDK(ctx)
 	if err != nil {
-		log.Logger().Fatal().Err(err)
+		return
 	}
+	// Handle shutdown properly so nothing leaks.
 	defer func() {
-		if err := tp.Shutdown(context.Background()); err != nil {
-			log.Logger().Err(err).Msg("Error shutting down tracer provider")
-		}
+		err = errors.Join(err, otelShutdown(context.Background()))
 	}()
 
 	port := config.Get().Port
@@ -157,18 +157,4 @@ func main() {
 		log.Logger().Info().Msg("timeout of 5 seconds.")
 	}
 	log.Logger().Info().Msg("server is stopped")
-}
-
-func initTracer() (*sdktrace.TracerProvider, error) {
-	exporter, err := stdout.New(stdout.WithPrettyPrint())
-	if err != nil {
-		return nil, err
-	}
-	tp := sdktrace.NewTracerProvider(
-		sdktrace.WithSampler(sdktrace.AlwaysSample()),
-		sdktrace.WithBatcher(exporter),
-	)
-	otel.SetTracerProvider(tp)
-	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
-	return tp, nil
 }
