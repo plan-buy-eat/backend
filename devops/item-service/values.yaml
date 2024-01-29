@@ -6,3 +6,4 @@ SERVICE_VERSION: latest
 DEBUG: false
 SERVICE_NAME: item-service
 REPLICAS: 5
+OTEL_COLLECTOR_HOST: otel-collector.monitoring.svc.cluster.local

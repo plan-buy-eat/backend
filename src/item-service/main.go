@@ -15,6 +15,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/shoppinglist/config"
 	"github.com/shoppinglist/item-service/handlers"
+	"github.com/shoppinglist/item-service/otel"
 	"github.com/shoppinglist/log"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"net/http"
@@ -46,18 +47,24 @@ func main() {
 	//defer stop()
 	ctx := context.Background()
 
+	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
+	defer cancel()
+
 	c := config.Get()
 	t := fmt.Sprintf("%s(%s)@%s: %s\n", c.ServiceName, c.HostName, c.ServiceVersion, time.Now().Local().Format(time.RFC1123Z))
 	log.Logger().Info().Msgf("Starting %s\n", t)
 
 	// Set up OpenTelemetry.
-	otelShutdown, err := setupOTelSDK(ctx)
+	otelShutdown, err := otel.SetupOTelSDK(ctx, config.Get().OtelCollectorHost)
 	if err != nil {
+		log.Logger().Fatal().Err(err).Msg("SetupOTelSDK")
+		time.Sleep(time.Minute)
 		return
 	}
 	// Handle shutdown properly so nothing leaks.
 	defer func() {
 		err = errors.Join(err, otelShutdown(context.Background()))
+		log.Logger().Fatal().Err(err).Msg("otelShutdown")
 	}()
 
 	port := config.Get().Port
@@ -106,7 +113,7 @@ func main() {
 	r.GET("/init", genericHandler.Init)
 	r.GET("/healthz", genericHandler.HealthZ)
 
-	toBuyHandler := handlers.NewItemHandler(sql.NullBool{
+	toBuyHandler, err := handlers.NewItemHandler(sql.NullBool{
 		Bool:  false,
 		Valid: true,
 	})
@@ -115,10 +122,13 @@ func main() {
 	toBuy.GET("/:id", toBuyHandler.GetItem)
 	toBuy.DELETE("/:id", toBuyHandler.BuyItem)
 
-	boughtHandler := handlers.NewItemHandler(sql.NullBool{
+	boughtHandler, err := handlers.NewItemHandler(sql.NullBool{
 		Bool:  true,
 		Valid: true,
 	})
+	if err != nil {
+		log.Logger().Fatal().Err(err).Msg("NewItemHandler")
+	}
 	bought := r.Group("/bought")
 	bought.GET("", boughtHandler.GetItems)
 	bought.GET("/:id", boughtHandler.GetItem)
@@ -146,8 +156,8 @@ func main() {
 	<-quit
 	log.Logger().Info().Msg("shutting down server...")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	ctx, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelShutdown()
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Logger().Fatal().Err(err).Msg("server shutdown")
 	}

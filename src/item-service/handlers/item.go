@@ -6,8 +6,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/shoppinglist/config"
 	"github.com/shoppinglist/db"
-	"github.com/shoppinglist/log"
 	"github.com/shoppinglist/models"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/trace"
 	"net/http"
 	"strconv"
 )
@@ -21,16 +23,33 @@ type ItemHandler interface {
 
 type itemHandler struct {
 	genericHandler
-	bought sql.NullBool
+	bought     sql.NullBool
+	tracer     trace.Tracer
+	meter      metric.Meter
+	apiCounter metric.Int64Counter
 }
 
-func NewItemHandler(bought sql.NullBool) ItemHandler {
-	return &itemHandler{
-		genericHandler{
+func NewItemHandler(bought sql.NullBool) (ItemHandler, error) {
+	h := &itemHandler{
+		genericHandler: genericHandler{
 			config: config.Get(),
 		},
-		bought,
+		bought: bought,
+		tracer: otel.GetTracerProvider().Tracer("ItemHandler"),
+		meter:  otel.Meter("ItemHandler"),
 	}
+
+	var err error
+	h.apiCounter, err = h.meter.Int64Counter(
+		"api.counter",
+		metric.WithDescription("Number of API calls."),
+		metric.WithUnit("{call}"),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return h, nil
 }
 
 func (h *itemHandler) GetItem(c *gin.Context) {
@@ -127,9 +146,19 @@ type PaginationQuery struct {
 }
 
 func (h *itemHandler) GetItems(c *gin.Context) {
-	ctx := c.Request.Context()
+	rCtx := c.Request.Context()
+	ctx, span := h.tracer.Start(rCtx, "GetItems")
+	defer span.End()
+	defer func() {
+		statusCode := c.Writer.Status()
+		if statusCode >= 400 {
+			span.AddEvent("Failed")
+		}
+	}()
 
-	log.Logger().Info().Any("env", c.Request.URL).Msgf("Env")
+	h.apiCounter.Add(ctx, 1)
+
+	span.AddEvent("Started")
 
 	var p PaginationQuery
 	if err := c.ShouldBindQuery(&p); err != nil {
@@ -158,6 +187,8 @@ func (h *itemHandler) GetItems(c *gin.Context) {
 	}
 	c.Header("X-Total-Count", strconv.Itoa(total))
 	h.res(c, itemsOut)
+
+	span.AddEvent("Succeeded")
 
 	c.Status(http.StatusOK)
 }

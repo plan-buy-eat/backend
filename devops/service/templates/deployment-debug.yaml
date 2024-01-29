@@ -41,4 +41,6 @@ spec:
             value: {{ .Values.SERVICE_NAME }}
           - name : "SERVICE_VERSION"
             value: {{ .Values.SERVICE_VERSION }}
+          - name: "OTEL_COLLECTOR_HOST"
+            value: {{ .Values.OTEL_COLLECTOR_HOST }}
 {{end}}

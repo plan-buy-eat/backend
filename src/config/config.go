@@ -7,10 +7,11 @@ import (
 )
 
 type Config struct {
-	ServiceName    string
-	HostName       string
-	ServiceVersion string
-	Port           string
+	ServiceName       string
+	HostName          string
+	ServiceVersion    string
+	Port              string
+	OtelCollectorHost string
 }
 
 var instance *Config
@@ -28,10 +29,11 @@ func Get() *Config {
 		log.Logger().Fatal().Err(err).Msg("getting hostname")
 	}
 	instance = &Config{
-		ServiceName:    getValue("SERVICE_NAME", ""),
-		HostName:       getValue("HOSTNAME", hostname),
-		ServiceVersion: getValue("SERVICE_VERSION", "0.0"),
-		Port:           getValue("PORT", "80"),
+		ServiceName:       getValue("SERVICE_NAME", ""),
+		HostName:          getValue("HOSTNAME", hostname),
+		ServiceVersion:    getValue("SERVICE_VERSION", "0.0"),
+		Port:              getValue("PORT", "80"),
+		OtelCollectorHost: getValue("OTEL_COLLECTOR_HOST", "localhost"),
 	}
 
 	return instance

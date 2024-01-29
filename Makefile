@@ -9,9 +9,9 @@ build-bastion:
 	docker build -t oltur/bastion:latest devops/docker -f devops/docker/bastion.Dockerfile
 	docker push oltur/bastion:latest
 
-.PHONY:install-bastion
-install-bastion: #build-bastion
-	helm install bastion-host --values devops/bastion-host/values.yaml  ./devops/bastion-host
+.PHONY: install-bastion
+install-bastion: # build-bastion
+	helm upgrade --install bastion-host --values devops/bastion-host/values.yaml  ./devops/bastion-host
 
 .PHONY:uninstall-bastion
 uninstall-bastion: #build-bastion
@@ -126,7 +126,9 @@ upgrade-item-service-debug: # build-item-service-debug
 .PHONY: uninstall-item-service
 uninstall-item-service:
 	helm uninstall item-service
+
 #====================================
+
 .PHONY: install-monitoring
 install-monitoring:
 	helm install kube-prometheus-stack prometheus-community/kube-prometheus-stack --namespace monitoring --create-namespace
@@ -189,7 +191,7 @@ status-couchbase:
 
 .PHONY: expose-couchbase-ui
 expose-couchbase-ui:
-	kubectl port-forward --namespace couchbase couchbase-0001 38091:8091
+	kubectl port-forward --namespace couchbase couchbase-0000 38091:8091
 
 .PHONY: expose-couchbase-api
 expose-couchbase-api:
@@ -241,11 +243,30 @@ lint:
 install-self-hosted-github-runners:
 	kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.3/cert-manager.crds.yaml
 	helm repo add jetstack https://charts.jetstack.io
-	helm install cert-manager --namespace cert-manager --version v1.13.3 jetstack/cert-manager --create-namespace
-	kubectl create ns actions-runner-system
+	helm upgrade --install cert-manager --namespace cert-manager --version v1.13.3 jetstack/cert-manager --create-namespace
+	kubectl create namespace actions-runner-system --dry-run=client -o yaml | kubectl apply -f -
 	kubectl create secret generic controller-manager -n actions-runner-system --from-literal=github_token=ghp_?????????????????? #self-hosted-runners-cluster-prod
 	helm repo add actions-runner-controller https://actions-runner-controller.github.io/actions-runner-controller
 	helm repo update
 	helm upgrade --install --namespace actions-runner-system --create-namespace --wait actions-runner-controller actions-runner-controller/actions-runner-controller --set syncPeriod=1m
 	kubectl create -f ./devops/self-hosted-runners/runner.yaml
 	kubectl apply -f ./devops/self-hosted-runners/horizontal_runner_autoscaler.yaml
+
+#.PHONY: install-otel-collectors
+#install-otel-collectors:
+#	helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+#	helm install my-opentelemetry-collector open-telemetry/opentelemetry-collector --set mode=daemonset
+#	# --set mode=<daemonset|deployment|statefulset>
+
+.PHONY: install-otel-collector
+install-otel-collector:
+	kubectl apply -f ./devops/otel/collector.yaml
+
+.PHONY: uninstall-otel-collector
+uninstall-otel-collector:
+	kubectl delete -f ./devops/otel/collector.yaml
+
+.PHONY: install-local-otel-collector
+install-local-otel-collector:
+	docker pull otel/opentelemetry-collector:0.93.0
+	docker run -d --name otel-collector -p 127.0.0.1:4317:4317 -p 127.0.0.1:55679:55679 otel/opentelemetry-collector:0.93.0
