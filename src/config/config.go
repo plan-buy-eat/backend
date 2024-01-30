@@ -12,6 +12,7 @@ type Config struct {
 	ServiceVersion    string
 	Port              string
 	OtelCollectorHost string
+	//LogFileName       string
 }
 
 var instance *Config
@@ -33,7 +34,9 @@ func Get() *Config {
 		HostName:          getValue("HOSTNAME", hostname),
 		ServiceVersion:    getValue("SERVICE_VERSION", "0.0"),
 		Port:              getValue("PORT", "80"),
-		OtelCollectorHost: getValue("OTEL_COLLECTOR_HOST", "localhost"),
+		OtelCollectorHost: getValue("OTEL_COLLECTOR_HOST", ""),
+		// TODO: moved to log.go for now
+		//LogFileName:       getValue("LOG_FILE_NAME", "/var/log/item-service.log"),
 	}
 
 	return instance

@@ -1186,7 +1186,7 @@ cluster:
       - search
       - analytics
       - eventing
-      size: 5
+      size: 3
   # -- SoftwareUpdateNotifications enables software update notifications in the
   # UI. When enabled, the UI will alert when a Couchbase server upgrade is
   # available.

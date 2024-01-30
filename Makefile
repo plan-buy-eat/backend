@@ -191,7 +191,7 @@ status-couchbase:
 
 .PHONY: expose-couchbase-ui
 expose-couchbase-ui:
-	kubectl port-forward --namespace couchbase couchbase-0000 38091:8091
+	kubectl port-forward --namespace couchbase service/couchbase 38091:8091
 
 .PHONY: expose-couchbase-api
 expose-couchbase-api:
@@ -260,11 +260,14 @@ install-self-hosted-github-runners:
 
 .PHONY: install-otel-collector
 install-otel-collector:
-	kubectl apply -f ./devops/otel/collector.yaml
+	# kubectl apply -f ./devops/otel/collector.yaml
+	kubectl apply -f ./devops/otel/collector/otel-config.yaml
+
 
 .PHONY: uninstall-otel-collector
 uninstall-otel-collector:
-	kubectl delete -f ./devops/otel/collector.yaml
+	# kubectl delete -f ./devops/otel/collector.yaml
+	kubectl delete -f ./devops/otel/collector/otel-config.yaml
 
 .PHONY: install-local-otel-collector
 install-local-otel-collector:

@@ -28,12 +28,17 @@ data:
       otlp:
         protocols:
           grpc:
-          http:
+            endpoint: "0.0.0.0:4317"
     processors:
-      batch:
     extensions:
       health_check: {}
     exporters:
+      jaeger:
+        endpoint: "jaeger-collector.monitoring.svc.cluster.local:14250"
+        insecure: true
+      prometheus:
+        endpoint: 0.0.0.0:8889
+        namespace: "shoppinglist"
       logging:
 
     service:
@@ -41,13 +46,13 @@ data:
       pipelines:
         traces:
           receivers: [otlp]
-          processors: [batch]
-          exporters: [logging]
+          processors: []
+          exporters: [jaeger]
 
         metrics:
           receivers: [otlp]
-          processors: [batch]
-          exporters: [logging]
+          processors: []
+          exporters: [prometheus, logging]
 ---
 apiVersion: v1
 kind: Service

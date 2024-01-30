@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/logger"
 	"github.com/gin-contrib/pprof"
@@ -17,7 +18,8 @@ import (
 	"github.com/shoppinglist/item-service/handlers"
 	"github.com/shoppinglist/item-service/otel"
 	"github.com/shoppinglist/log"
-	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
+
+	// "go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"net/http"
 	"os"
 	"os/signal"
@@ -100,7 +102,7 @@ func main() {
 	}))
 	r.Use(ErrorHandler())
 
-	r.Use(otelgin.Middleware(config.Get().ServiceName))
+	// r.Use(otelgin.Middleware(config.Get().ServiceName))
 
 	r.NoRoute(func(c *gin.Context) {
 		c.JSON(http.StatusNotFound, "Page not found")
