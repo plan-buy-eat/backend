@@ -64,7 +64,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VALIDATE_GO: false
           IGNORE_GITIGNORED_FILES: true
-          FILTER_REGEX_EXCLUDE: ".*(sandbox|couchbase|templates).*"
+          FILTER_REGEX_EXCLUDE: ".*(sandbox|couchbase|templates|devops/otel/local).*"
           BASH_SEVERITY: "error"
           VALIDATE_NATURAL_LANGUAGE: false
           VALIDATE_DOCKERFILE_HADOLINT: false

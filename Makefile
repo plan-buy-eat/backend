@@ -218,7 +218,7 @@ uninstall-ingress-example:
 #==================================================================================================
 .PHONY: lint
 lint:
-	$(eval FILTER_REGEX_EXCLUDE=".*(sandbox|couchbase|templates).*")
+	$(eval FILTER_REGEX_EXCLUDE=".*(sandbox|couchbase|templates|devops/otel/local).*")
 	echo $(FILTER_REGEX_EXCLUDE)
 	docker run \
       -e RUN_LOCAL=true \
