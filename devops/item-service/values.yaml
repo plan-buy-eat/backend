@@ -6,4 +6,5 @@ SERVICE_VERSION: latest
 DEBUG: false
 SERVICE_NAME: item-service
 REPLICAS: 3
-OTEL_COLLECTOR_HOST: otel-collector.default.svc.cluster.local
+OTEL_COLLECTOR_HOST: my-opentelemetry-collector.default.svc.cluster.local
+# OTEL_COLLECTOR_HOST: otel-collector.default.svc.cluster.local

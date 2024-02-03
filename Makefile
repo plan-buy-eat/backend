@@ -252,22 +252,23 @@ install-self-hosted-github-runners:
 	kubectl create -f ./devops/self-hosted-runners/runner.yaml
 	kubectl apply -f ./devops/self-hosted-runners/horizontal_runner_autoscaler.yaml
 
-#.PHONY: install-otel-collectors
-#install-otel-collectors:
-#	helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
-#	helm install my-opentelemetry-collector open-telemetry/opentelemetry-collector --set mode=daemonset
-#	# --set mode=<daemonset|deployment|statefulset>
+.PHONY: install-otel-collectors
+install-otel-collectors:
+	helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+	helm upgrade --install my-opentelemetry-collector open-telemetry/opentelemetry-collector --set mode=deployment --values devops/otel/opentelemetry-collector/values.yaml
+	# --set mode=<daemonset|deployment|statefulset>
 
-.PHONY: install-otel-collector
-install-otel-collector:
-	# kubectl apply -f ./devops/otel/collector.yaml
-	kubectl apply -f ./devops/otel/collector/otel-config.yaml
+# .PHONY: install-otel-collector
+# install-otel-collector:
+# 	# kubectl apply -f ./devops/otel/collector.yaml
+# 	kubectl apply -f ./devops/otel/collector/otel-config.yaml
 
 
-.PHONY: uninstall-otel-collector
-uninstall-otel-collector:
-	# kubectl delete -f ./devops/otel/collector.yaml
-	kubectl delete -f ./devops/otel/collector/otel-config.yaml
+# now using one above
+# .PHONY: uninstall-otel-collector
+# uninstall-otel-collector:
+# 	# kubectl delete -f ./devops/otel/collector.yaml
+# 	kubectl delete -f ./devops/otel/collector/otel-config.yaml
 
 .PHONY: install-local-otel-collector
 install-local-otel-collector:
