@@ -6,11 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"time"
+
 	"github.com/couchbase/gocb/v2"
 	"github.com/shoppinglist/log"
 	"github.com/shoppinglist/models"
-	"os"
-	"time"
 )
 
 type GenericDB interface {
@@ -70,6 +71,18 @@ func (d *db) init(ctx context.Context) error {
 	}
 
 	d.searchIndexManager = d.cluster.SearchIndexes()
+
+	err = d.cluster.Buckets().CreateBucket(gocb.CreateBucketSettings{
+		BucketSettings: gocb.BucketSettings{
+			Name: bucketName,
+		},
+	}, &gocb.CreateBucketOptions{
+		Context: ctx,
+	})
+	if err != nil && !errors.Is(err, gocb.ErrBucketExists) {
+		log.Logger().Err(err)
+		return err
+	}
 
 	d.bucket = d.cluster.Bucket(bucketName)
 

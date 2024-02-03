@@ -129,26 +129,26 @@ uninstall-item-service:
 
 #====================================
 
-.PHONY: install-monitoring
-install-monitoring:
+.PHONY: install-kube-prometheus-stack
+install-kube-prometheus-stack:
 	helm install kube-prometheus-stack prometheus-community/kube-prometheus-stack --namespace monitoring --create-namespace
 
-.PHONY: uninstall-monitoring
-uninstall-monitoring:
+.PHONY: uninstall-kube-prometheus-stack
+uninstall-kube-prometheus-stack:
 	helm uninstall kube-prometheus-stack --namespace monitoring
 
-.PHONY: expose-prometheus
-expose-prometheus:
+.PHONY: expose-kube-prometheus-stack-prometheus
+expose-kube-prometheus-stack-prometheus:
 	kubectl --namespace monitoring port-forward svc/kube-prometheus-stack 9090
 	# Then access via http://localhost:9090
 
-.PHONY: expose-grafana
-expose-grafana:
+.PHONY: expose-kube-prometheus-stack-grafana
+expose-kube-prometheus-stack-grafana:
 	kubectl --namespace monitoring port-forward svc/kube-prometheus-stack-grafana 3000:80
 	# Then access via http://localhost:3000
 
-.PHONY: expose-alertmanager
-expose-alertmanager:
+.PHONY: expose-kube-prometheus-stack-alertmanager
+expose-kube-prometheus-stack-alertmanager:
 	kubectl --namespace monitoring port-forward svc/alertmanager-main 9093
 	# Then access via http://localhost:9093
 
@@ -175,11 +175,11 @@ install-couchbase-local:
 
 .PHONY: install-couchbase
 install-couchbase:
-#	helm repo add couchbase https://couchbase-partners.github.io/helm-charts/
-#	helm repo update
+	helm repo add couchbase https://couchbase-partners.github.io/helm-charts/
+	helm repo update
 #	helm install couchbase --set cluster.name=couchbase --values devops/couchbase/values.yaml --set tls.generate=true couchbase/couchbase-operator
 #	helm install couchbase --set cluster.name=couchbase --values devops/couchbase/values.yaml --set tls.generate=true ./devops/couchbase/couchbase-operator
-	helm upgrade --install couchbase --set cluster.name=couchbase --values devops/couchbase/values.yaml --set tls.generate=true --namespace couchbase --create-namespace ./devops/couchbase/couchbase-operator
+	helm upgrade --install couchbase --set cluster.name=couchbase --values devops/couchbase/values.yaml --namespace couchbase --create-namespace ./devops/couchbase/couchbase-operator
 
 .PHONY: uninstall-couchbase
 uninstall-couchbase:
@@ -273,3 +273,15 @@ uninstall-otel-collector:
 install-local-otel-collector:
 	docker pull otel/opentelemetry-collector:0.93.0
 	docker run -d --name otel-collector -p 127.0.0.1:4317:4317 -p 127.0.0.1:55679:55679 otel/opentelemetry-collector:0.93.0
+
+.PHONY: install-metrics-server
+install-metrics-server:
+	kubectl apply -f ./devops/metrics-server/components.yaml
+
+# .PHONY: install-k8s-otel-collector
+# install-k8s-otel-collector:
+# 	helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+# 	helm repo update
+# 	helm install ksm prometheus-community/kube-state-metrics -n "default"
+# 	helm install nodeexporter prometheus-community/prometheus-node-exporter -n "default"
+# 	TBD
