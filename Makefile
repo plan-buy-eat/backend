@@ -49,7 +49,7 @@ build-user-service-debug:
 #	$(eval COUCHBASE_PASSWORD=$(shell helm status couchbase --namespace couchbase | sed -n -e 's/^.*password: //p'))
 #	$(eval SERVICE_VERSION=$(SERVICE_VERSION))
 #	$(eval DEBUG=false)
-#	helm install user-service --values devops/user-service/values.yaml --set SERVICE_NAME=user-service --set DEBUG=$(DEBUG) --set COUCHBASE_PASSWORD=$(COUCHBASE_PASSWORD) --set SERVICE_VERSION=$(SERVICE_VERSION) devops/service
+#	helm upgrade --install user-service --values devops/user-service/values.yaml --set SERVICE_NAME=user-service --set DEBUG=$(DEBUG) --set COUCHBASE_PASSWORD=$(COUCHBASE_PASSWORD) --set SERVICE_VERSION=$(SERVICE_VERSION) devops/service
 
 .PHONY: upgrade-user-service
 upgrade-user-service: # build-user-service
@@ -65,7 +65,7 @@ upgrade-user-service: # build-user-service
 #	$(eval COUCHBASE_PASSWORD=$(shell helm status couchbase --namespace couchbase | sed -n -e 's/^.*password: //p'))
 #	$(eval SERVICE_VERSION=$(SERVICE_VERSION))
 #	$(eval DEBUG=true)
-#	helm install user-service --values devops/user-service/values.yaml --set SERVICE_NAME=user-service --set DEBUG=$(DEBUG) --set COUCHBASE_PASSWORD=$(COUCHBASE_PASSWORD) --set SERVICE_VERSION=$(SERVICE_VERSION) devops/service
+#	helm upgrade --install user-service --values devops/user-service/values.yaml --set SERVICE_NAME=user-service --set DEBUG=$(DEBUG) --set COUCHBASE_PASSWORD=$(COUCHBASE_PASSWORD) --set SERVICE_VERSION=$(SERVICE_VERSION) devops/service
 
 .PHONY: upgrade-user-service-debug
 upgrade-user-service-debug: # build-user-service-debug
@@ -97,7 +97,7 @@ build-item-service-debug:
 #	$(eval COUCHBASE_PASSWORD=$(shell helm status couchbase --namespace couchbase | sed -n -e 's/^.*password: //p'))
 #	$(eval SERVICE_VERSION=$(SERVICE_VERSION))
 #	$(eval DEBUG=false)
-#	helm install item-service --values devops/item-service/values.yaml --set DEBUG=$(DEBUG) --set COUCHBASE_PASSWORD=$(COUCHBASE_PASSWORD) --set SERVICE_VERSION=$(SERVICE_VERSION) devops/service
+#	helm upgrade --install item-service --values devops/item-service/values.yaml --set DEBUG=$(DEBUG) --set COUCHBASE_PASSWORD=$(COUCHBASE_PASSWORD) --set SERVICE_VERSION=$(SERVICE_VERSION) devops/service
 
 #.PHONY: install-item-service-debug
 #install-item-service-debug: # build-item-service-debug
@@ -105,7 +105,7 @@ build-item-service-debug:
 #	$(eval COUCHBASE_PASSWORD=$(shell helm status couchbase --namespace couchbase | sed -n -e 's/^.*password: //p'))
 #	$(eval SERVICE_VERSION=$(SERVICE_VERSION))
 #	$(eval DEBUG=true)
-#	helm install item-service --values devops/item-service/values.yaml --set DEBUG=$(DEBUG) --set COUCHBASE_PASSWORD=$(COUCHBASE_PASSWORD) --set SERVICE_VERSION=$(SERVICE_VERSION) devops/service
+#	helm upgrade --install item-service --values devops/item-service/values.yaml --set DEBUG=$(DEBUG) --set COUCHBASE_PASSWORD=$(COUCHBASE_PASSWORD) --set SERVICE_VERSION=$(SERVICE_VERSION) devops/service
 
 .PHONY: upgrade-item-service
 upgrade-item-service: # build-item-service
@@ -131,7 +131,7 @@ uninstall-item-service:
 
 .PHONY: install-kube-prometheus-stack
 install-kube-prometheus-stack:
-	helm install kube-prometheus-stack prometheus-community/kube-prometheus-stack --namespace monitoring --create-namespace
+	helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack --namespace monitoring --create-namespace --values devops/kube-prometheus-stack/values.yaml
 
 .PHONY: uninstall-kube-prometheus-stack
 uninstall-kube-prometheus-stack:
@@ -157,7 +157,7 @@ expose-kube-prometheus-stack-alertmanager:
 .PHONY: install-traefik
 install-traefik:
 	helm repo add traefik https://traefik.github.io/charts
-	helm install traefik traefik/traefik --values devops/k8s/traefik/values.yaml
+	helm upgrade --install traefik traefik/traefik --values devops/k8s/traefik/values.yaml
 
 .PHONY: uninstall-traefik
 uninstall-traefik:
@@ -177,8 +177,8 @@ install-couchbase-local:
 install-couchbase:
 	helm repo add couchbase https://couchbase-partners.github.io/helm-charts/
 	helm repo update
-#	helm install couchbase --set cluster.name=couchbase --values devops/couchbase/values.yaml --set tls.generate=true couchbase/couchbase-operator
-#	helm install couchbase --set cluster.name=couchbase --values devops/couchbase/values.yaml --set tls.generate=true ./devops/couchbase/couchbase-operator
+#	helm upgrade --install couchbase --set cluster.name=couchbase --values devops/couchbase/values.yaml --set tls.generate=true couchbase/couchbase-operator
+#	helm upgrade --install couchbase --set cluster.name=couchbase --values devops/couchbase/values.yaml --set tls.generate=true ./devops/couchbase/couchbase-operator
 	helm upgrade --install couchbase --set cluster.name=couchbase --values devops/couchbase/values.yaml --namespace couchbase --create-namespace ./devops/couchbase/couchbase-operator
 
 .PHONY: uninstall-couchbase
@@ -201,7 +201,7 @@ expose-couchbase-api:
 
 .PHONY: install-test-service
 install-test-service:
-	helm install test-service --values devops/test-service/values.yaml  ./devops/test-service # --namespace test
+	helm upgrade --install test-service --values devops/test-service/values.yaml  ./devops/test-service # --namespace test
 
 .PHONY: uninstall-test-service
 uninstall-test-service:
@@ -209,7 +209,7 @@ uninstall-test-service:
 
 .PHONY: install-ingress-example
 install-ingress-example:
-	helm install ingress-example ./devops/kind/ingress-example
+	helm upgrade --install ingress-example ./devops/kind/ingress-example
 
 .PHONY: uninstall-ingress-example
 uninstall-ingress-example:
@@ -252,8 +252,8 @@ install-self-hosted-github-runners:
 	kubectl create -f ./devops/self-hosted-runners/runner.yaml
 	kubectl apply -f ./devops/self-hosted-runners/horizontal_runner_autoscaler.yaml
 
-.PHONY: install-otel-collectors
-install-otel-collectors:
+.PHONY: install-otel-collector
+install-otel-collector:
 	helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
 	helm upgrade --install my-opentelemetry-collector open-telemetry/opentelemetry-collector --set mode=deployment --values devops/otel/opentelemetry-collector/values.yaml
 	# --set mode=<daemonset|deployment|statefulset>
@@ -283,6 +283,10 @@ install-metrics-server:
 # install-k8s-otel-collector:
 # 	helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 # 	helm repo update
-# 	helm install ksm prometheus-community/kube-state-metrics -n "default"
-# 	helm install nodeexporter prometheus-community/prometheus-node-exporter -n "default"
+# 	helm upgrade --install ksm prometheus-community/kube-state-metrics -n "default"
+# 	helm upgrade --install nodeexporter prometheus-community/prometheus-node-exporter -n "default"
 # 	TBD
+
+# .PHONY: install-prometheus
+# install-prometheus:
+# 	helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
