@@ -3595,7 +3595,7 @@ prometheus:
         static_configs:
           - targets: 
             - 'my-opentelemetry-collector.default.svc.cluster.local:8888'
-            # - 'my-opentelemetry-collector.default.svc.cluster.local:8889'
+            - 'my-opentelemetry-collector.default.svc.cluster.local:8889'
     # - job_name: kube-etcd
     #   kubernetes_sd_configs:
     #     - role: node

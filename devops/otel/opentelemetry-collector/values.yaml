@@ -91,8 +91,8 @@ config:
     # Will be removed in a future release.
     # Use the debug exporter instead.
     logging: {}
-    # prometheus:
-    #   endpoint: 0.0.0.0:8889"
+    prometheus:
+      endpoint: 0.0.0.0:8889
   extensions:
     # The health_check extension is mandatory for this chart.
     # Without the health_check extension the collector will fail the readiness and liveliness probes.
@@ -148,7 +148,7 @@ config:
       metrics:
         exporters:
           - debug
-          # - prometheus
+          - prometheus
         processors:
           - memory_limiter
           - batch
@@ -288,13 +288,11 @@ ports:
     containerPort: 8888
     servicePort: 8888
     protocol: TCP
-  # prometheus:
-  #   # The metrics port is disabled by default. However you need to enable the port
-  #   # in order to use the ServiceMonitor (serviceMonitor.enabled) or PodMonitor (podMonitor.enabled).
-  #   enabled: true
-  #   containerPort: 8889
-  #   servicePort: 8889
-  #   protocol: TCP
+  prometheus:
+    enabled: true
+    containerPort: 8889
+    servicePort: 8889
+    protocol: TCP
 
 # Resource limits & requests. Update according to your own use case as these values might be too low for a typical deployment.
 resources: {}
@@ -474,6 +472,7 @@ podMonitor:
   metricsEndpoints:
     - port: metrics
       # interval: 15s
+    # - port: prometheus
 
   # additional labels for the PodMonitor
   extraLabels: {}
@@ -560,15 +559,15 @@ networkPolicy:
   #
   # See the standard NetworkPolicy 'spec.ingress' definition for more info:
   # https://kubernetes.io/docs/reference/kubernetes-api/policy-resources/network-policy-v1/
-  extraIngressRules:
-  - ports:
-    - port: metrics
-      protocol: TCP
-    - port: prometheus
-      protocol: TCP
-    from:
-      - ipBlock:
-          cidr: 192.168.1.64/32
+  extraIngressRules: []
+  # - ports:
+  #   - port: metrics
+  #     protocol: TCP
+  #   - port: prometheus
+  #     protocol: TCP
+  #   from:
+  #     - ipBlock:
+  #         cidr: 192.168.1.64/32
 
   # Restrict egress traffic from the OpenTelemetry collector pod
   # See the standard NetworkPolicy 'spec.egress' definition for more info:
