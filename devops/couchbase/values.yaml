@@ -667,7 +667,7 @@ buckets:
       # and `CouchbaseCollectionGroup` resource documentation.  If this field is
       # set to `false` while the  already managed, then the Operator will leave
       # whatever configuration is already present.
-      managed: true
+      managed: false
       # -- Resources is an explicit list of named resources that will be
       # considered for inclusion in this bucket.  If a resource reference
       # doesn't match a resource, then no error conditions are raised due to
@@ -968,7 +968,7 @@ cluster:
           # hour.
           age: 1h
           # Enable this sidecar by setting to true, defaults to being disabled.
-          enabled: true
+          enabled: false
           # Image is the image to be used to run the audit sidecar helper. No
           # validation is carried out as this can be any arbitrary repo and tag.
           image: busybox:1.33.1

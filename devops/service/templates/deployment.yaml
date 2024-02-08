@@ -18,7 +18,14 @@ spec:
         date: "{{ now | unixEpoch }}"
     spec:
       containers:
-      - image: "oltur/{{ .Values.SERVICE_NAME }}:{{ .Values.SERVICE_VERSION }}"
+      - resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        image: "oltur/{{ .Values.SERVICE_NAME }}:{{ .Values.SERVICE_VERSION }}"
         name: {{ .Values.SERVICE_NAME }}
         imagePullPolicy: Always
         ports:
