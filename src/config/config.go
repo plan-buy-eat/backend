@@ -1,9 +1,10 @@
 package config
 
 import (
-	"github.com/shoppinglist/log"
 	"os"
 	"sync"
+
+	"github.com/shoppinglist/log"
 )
 
 type Config struct {
@@ -13,6 +14,10 @@ type Config struct {
 	Port              string
 	OtelCollectorHost string
 	//LogFileName       string
+	CouchbaseConnectionString string
+	CouchbaseBucketName       string
+	CouchbaseUsername         string
+	CouchbasePassword         string
 }
 
 var instance *Config
@@ -37,6 +42,10 @@ func Get() *Config {
 		OtelCollectorHost: getValue("OTEL_COLLECTOR_HOST", ""),
 		// TODO: moved to log.go for now
 		//LogFileName:       getValue("LOG_FILE_NAME", "/var/log/item-service.log"),
+		CouchbaseConnectionString: getValue("COUCHBASE_CONNECTION_STRING", ""),
+		CouchbaseBucketName:       getValue("COUCHBASE_BUCKET", ""),
+		CouchbaseUsername:         getValue("COUCHBASE_USERNAME", ""),
+		CouchbasePassword:         getValue("COUCHBASE_PASSWORD", ""),
 	}
 
 	return instance

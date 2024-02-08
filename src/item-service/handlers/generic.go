@@ -3,11 +3,12 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/shoppinglist/config"
 	"github.com/shoppinglist/db"
-	"net/http"
-	"time"
 
 	"github.com/shoppinglist/log"
 )
@@ -30,7 +31,7 @@ func NewGenericHandler() GenericHandler {
 func (h *genericHandler) HealthZ(c *gin.Context) {
 	ctx := c.Request.Context()
 	c.Header("Content-Type", "text/plain")
-	itemsDB, err := db.NewGenericDB(ctx)
+	itemsDB, err := db.NewGenericDB(ctx, h.config)
 	if err != nil {
 		h.err(c, "getting db", err)
 		return

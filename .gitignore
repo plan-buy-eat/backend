@@ -67,3 +67,5 @@ core.*
 *.core
 
 secrets.txt
+src/item-service/var/log/shoppinglist/item-service.log
+src/item-service/__debug_bin940892471

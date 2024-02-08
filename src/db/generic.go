@@ -6,10 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/couchbase/gocb/v2"
+	"github.com/shoppinglist/config"
 	"github.com/shoppinglist/log"
 	"github.com/shoppinglist/models"
 )
@@ -30,15 +30,18 @@ type db struct {
 	fields             []string
 
 	bought sql.NullBool
+
+	cfg *config.Config
 }
 
-func NewGenericDB(ctx context.Context) (GenericDB, error) {
+func NewGenericDB(ctx context.Context, cfg *config.Config) (GenericDB, error) {
 	db := &db{
 		fields: []string{"title", "amount", "unit", "bought", "shop"},
 		bought: sql.NullBool{
 			Bool:  false,
 			Valid: false,
 		},
+		cfg: cfg,
 	}
 	err := db.init(ctx)
 	if err != nil {
@@ -54,10 +57,10 @@ func (d *db) init(ctx context.Context) error {
 
 	var err error
 
-	connectionString := os.Getenv("COUCHBASE_CONNECTION_STRING")
-	bucketName := os.Getenv("COUCHBASE_BUCKET")
-	username := os.Getenv("COUCHBASE_USERNAME")
-	password := os.Getenv("COUCHBASE_PASSWORD")
+	connectionString := d.cfg.CouchbaseConnectionString
+	bucketName := d.cfg.CouchbaseBucketName
+	username := d.cfg.CouchbaseUsername
+	password := d.cfg.CouchbasePassword
 
 	d.cluster, err = gocb.Connect(connectionString, gocb.ClusterOptions{
 		Authenticator: gocb.PasswordAuthenticator{
