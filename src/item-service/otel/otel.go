@@ -3,13 +3,14 @@ package otel
 import (
 	"context"
 	"errors"
+	"time"
+
 	"github.com/shoppinglist/log"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/exporters/stdout/stdoutmetric"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"time"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
@@ -77,14 +78,14 @@ func newTraceProvider(ctx context.Context, otelCollectorHost string) (*trace.Tra
 	var conn *grpc.ClientConn
 	var err error
 	if otelCollectorHost != "" {
-		log.Logger().Info().Str("address", otelCollectorHost+":4317").Msg("connecting to trace collector")
+		log.Logger(ctx).Info().Str("address", otelCollectorHost+":4317").Msg("connecting to trace collector")
 		conn, err = grpc.DialContext(ctx, otelCollectorHost+":4317",
 			// Note the use of insecure transport here. TLS is recommended in production.
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
 			grpc.WithBlock(),
 		)
 		if err != nil {
-			log.Logger().Err(err).Msg("failed to create gRPC connection to collector")
+			log.Logger(ctx).Err(err).Msg("failed to create gRPC connection to collector")
 			useStdout = true
 		}
 	} else {
@@ -96,16 +97,16 @@ func newTraceProvider(ctx context.Context, otelCollectorHost string) (*trace.Tra
 	if !useStdout {
 		traceExporter, err = otlptracegrpc.New(ctx, otlptracegrpc.WithGRPCConn(conn))
 		if err != nil {
-			log.Logger().Err(err).Msg("failed to create trace exporter")
+			log.Logger(ctx).Err(err).Msg("failed to create trace exporter")
 			useStdout = true
 		}
 	}
 	if traceExporter == nil {
-		log.Logger().Info().Msg("falling back to stdout trace")
+		log.Logger(ctx).Info().Msg("falling back to stdout trace")
 		traceExporter, err = stdouttrace.New(
 			stdouttrace.WithPrettyPrint())
 		if err != nil {
-			log.Logger().Err(err).Msg("failed to create stdout trace exporter")
+			log.Logger(ctx).Err(err).Msg("failed to create stdout trace exporter")
 			return nil, err
 		}
 	}
@@ -122,23 +123,23 @@ func newMeterProvider(ctx context.Context, otelCollectorHost string) (*metric.Me
 	var metricExporter metric.Exporter
 	var err error
 	if otelCollectorHost != "" {
-		log.Logger().Info().Str("address", otelCollectorHost+":4317").Msg("connecting to metric collector")
+		log.Logger(ctx).Info().Str("address", otelCollectorHost+":4317").Msg("connecting to metric collector")
 		metricExporter, err = otlpmetricgrpc.New(ctx,
 			otlpmetricgrpc.WithInsecure(),
 			otlpmetricgrpc.WithEndpoint(otelCollectorHost+":4317"),
 		)
 		if err != nil {
-			log.Logger().Err(err).Msg("failed to create metric exporter")
+			log.Logger(ctx).Err(err).Msg("failed to create metric exporter")
 			useStdout = true
 		}
 	} else {
 		useStdout = true
 	}
 	if useStdout == true || metricExporter == nil {
-		log.Logger().Info().Msg("falling back to stdout metric")
+		log.Logger(ctx).Info().Msg("falling back to stdout metric")
 		metricExporter, err = stdoutmetric.New()
 		if err != nil {
-			log.Logger().Err(err).Msg("failed to create stdout metric exporter")
+			log.Logger(ctx).Err(err).Msg("failed to create stdout metric exporter")
 			return nil, err
 		}
 	}

@@ -29,10 +29,11 @@ import (
 
 func ErrorHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		ctx := c.Request.Context()
 		c.Status(http.StatusOK)
 		c.Next()
 		for _, err := range c.Errors {
-			log.Logger().Err(err).Msg("error while processing request")
+			log.Logger(ctx).Err(err).Msg("error while processing request")
 		}
 		if len(c.Errors) > 0 && c.Writer.Status() == http.StatusOK {
 			c.JSON(http.StatusInternalServerError, "Internal Server Error")
@@ -42,7 +43,7 @@ func ErrorHandler() gin.HandlerFunc {
 
 func main() {
 	// zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-	// log.Logger().Info().Any("env", os.Environ()).Msgf("Env")
+	// log.Logger(ctx).Info().Any("env", os.Environ()).Msgf("Env")
 
 	//// Handle SIGINT (CTRL+C) gracefully.
 	//ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -52,26 +53,26 @@ func main() {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
 
-	c := config.Get()
+	c := config.Get(ctx)
 	t := fmt.Sprintf("%s(%s)@%s: %s\n", c.ServiceName, c.HostName, c.ServiceVersion, time.Now().Local().Format(time.RFC1123Z))
-	log.Logger().Info().Msgf("Starting %s\n", t)
+	log.Logger(ctx).Info().Msgf("Starting %s\n", t)
 
 	// Set up OpenTelemetry.
-	otelShutdown, err := otel.SetupOTelSDK(ctx, config.Get().OtelCollectorHost)
+	otelShutdown, err := otel.SetupOTelSDK(ctx, c.OtelCollectorHost)
 	if err != nil {
-		log.Logger().Fatal().Err(err).Msg("SetupOTelSDK")
+		log.Logger(ctx).Fatal().Err(err).Msg("SetupOTelSDK")
 		time.Sleep(time.Minute)
 		return
 	}
 	// Handle shutdown properly so nothing leaks.
 	defer func() {
 		err = errors.Join(err, otelShutdown(context.Background()))
-		log.Logger().Fatal().Err(err).Msg("otelShutdown")
+		log.Logger(ctx).Fatal().Err(err).Msg("otelShutdown")
 	}()
 
-	port := config.Get().Port
+	port := c.Port
 	listenAddress := "0.0.0.0:" + port
-	log.Logger().Info().Msgf("Listening at %s", listenAddress)
+	log.Logger(ctx).Info().Msgf("Listening at %s", listenAddress)
 
 	r := gin.New()
 	pprof.Register(r)
@@ -102,7 +103,7 @@ func main() {
 	}))
 	r.Use(ErrorHandler())
 
-	// r.Use(otelgin.Middleware(config.Get().ServiceName))
+	// r.Use(otelgin.Middleware(c.ServiceName))
 
 	r.NoRoute(func(c *gin.Context) {
 		c.JSON(http.StatusNotFound, "Page not found")
@@ -111,11 +112,11 @@ func main() {
 		c.JSON(http.StatusMethodNotAllowed, "Method not found")
 	})
 
-	genericHandler := handlers.NewGenericHandler()
+	genericHandler := handlers.NewGenericHandler(ctx)
 	r.GET("/init", genericHandler.Init)
 	r.GET("/healthz", genericHandler.HealthZ)
 
-	toBuyHandler, err := handlers.NewItemHandler(sql.NullBool{
+	toBuyHandler, err := handlers.NewItemHandler(ctx, sql.NullBool{
 		Bool:  false,
 		Valid: true,
 	})
@@ -124,12 +125,12 @@ func main() {
 	toBuy.GET("/:id", toBuyHandler.GetItem)
 	toBuy.DELETE("/:id", toBuyHandler.BuyItem)
 
-	boughtHandler, err := handlers.NewItemHandler(sql.NullBool{
+	boughtHandler, err := handlers.NewItemHandler(ctx, sql.NullBool{
 		Bool:  true,
 		Valid: true,
 	})
 	if err != nil {
-		log.Logger().Fatal().Err(err).Msg("NewItemHandler")
+		log.Logger(ctx).Fatal().Err(err).Msg("NewItemHandler")
 	}
 	bought := r.Group("/bought")
 	bought.GET("", boughtHandler.GetItems)
@@ -144,7 +145,7 @@ func main() {
 	go func() {
 		// service connections
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Logger().Fatal().Err(err).Msg("listen\n")
+			log.Logger(ctx).Fatal().Err(err).Msg("listen\n")
 		}
 	}()
 
@@ -156,17 +157,17 @@ func main() {
 	// kill -9 is syscall. SIGKILL but can"t be caught, so don't need to add it
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	log.Logger().Info().Msg("shutting down server...")
+	log.Logger(ctx).Info().Msg("shutting down server...")
 
 	ctx, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancelShutdown()
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Logger().Fatal().Err(err).Msg("server shutdown")
+		log.Logger(ctx).Fatal().Err(err).Msg("server shutdown")
 	}
 	// catching ctx.Done(). timeout of 5 seconds.
 	select {
 	case <-ctx.Done():
-		log.Logger().Info().Msg("timeout of 5 seconds.")
+		log.Logger(ctx).Info().Msg("timeout of 5 seconds.")
 	}
-	log.Logger().Info().Msg("server is stopped")
+	log.Logger(ctx).Info().Msg("server is stopped")
 }

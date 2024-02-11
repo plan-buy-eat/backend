@@ -53,11 +53,11 @@ func (d *db) UpsertItem(ctx context.Context, inId string, item *models.Item) (ou
 	_, err = d.collection.Upsert(outId, item,
 		&gocb.UpsertOptions{Context: ctx})
 	if err != nil {
-		log.Logger().Err(err)
+		log.Logger(ctx).Err(err)
 		return
 
 	}
-	log.Logger().Info().Msgf("Item created: %s\n", inId)
+	log.Logger(ctx).Info().Msgf("Item created: %s\n", inId)
 	return
 }
 
@@ -65,7 +65,7 @@ func (d *db) GetItem(ctx context.Context, id string) (item *models.Item, err err
 	getResult, err := d.collection.Get(id,
 		&gocb.GetOptions{Context: ctx})
 	if err != nil {
-		log.Logger().Err(err)
+		log.Logger(ctx).Err(err)
 		return
 
 	}
@@ -73,7 +73,7 @@ func (d *db) GetItem(ctx context.Context, id string) (item *models.Item, err err
 	item = &models.Item{}
 	err = getResult.Content(item)
 	if err != nil {
-		log.Logger().Err(err)
+		log.Logger(ctx).Err(err)
 		return
 	}
 
@@ -93,7 +93,7 @@ func (d *db) BuyItem(ctx context.Context, id string, bought bool) (err error) {
 	}
 	if d.collection == nil {
 		err = fmt.Errorf("collection is nil")
-		log.Logger().Err(err)
+		log.Logger(ctx).Err(err)
 		return
 	}
 	_, err = d.collection.MutateIn(id, mops, &gocb.MutateInOptions{
@@ -101,7 +101,7 @@ func (d *db) BuyItem(ctx context.Context, id string, bought bool) (err error) {
 		//Timeout: 10050 * time.Millisecond,
 	})
 	if err != nil {
-		log.Logger().Err(err)
+		log.Logger(ctx).Err(err)
 		return
 	}
 
@@ -145,13 +145,13 @@ func (d *db) GetItems(ctx context.Context, q *PaginationQuery, searchQuery strin
 		query += fmt.Sprintf("\nLIMIT %d ", q.End-q.Start)
 	}
 
-	log.Logger().Info().Msgf("Query: %s", query)
+	log.Logger(ctx).Info().Msgf("Query: %s", query)
 	params := map[string]interface{}{
 		"searchQuery": searchQuery,
 	}
 	queryResult, err := d.scope.Query(query, &gocb.QueryOptions{Adhoc: true, Context: ctx, NamedParameters: params})
 	if err != nil {
-		log.Logger().Err(err)
+		log.Logger(ctx).Err(err)
 		return
 	}
 	items = []*models.ItemWithID{}
@@ -159,13 +159,13 @@ func (d *db) GetItems(ctx context.Context, q *PaginationQuery, searchQuery strin
 		var item models.ItemWithID
 		err = queryResult.Row(&item)
 		if err != nil {
-			log.Logger().Err(err)
+			log.Logger(ctx).Err(err)
 			return
 		}
 		items = append(items, &item)
 	}
 	if err = queryResult.Err(); err != nil {
-		log.Logger().Err(err)
+		log.Logger(ctx).Err(err)
 		return
 	}
 
@@ -174,13 +174,13 @@ func (d *db) GetItems(ctx context.Context, q *PaginationQuery, searchQuery strin
 	}
 	queryResultTotal, err := d.scope.Query(queryTotal, &gocb.QueryOptions{Adhoc: true, Context: ctx, NamedParameters: paramsTotal})
 	if err != nil {
-		log.Logger().Err(err)
+		log.Logger(ctx).Err(err)
 		return
 	}
 	var totalResult models.Total
 	err = queryResultTotal.One(&totalResult)
 	if err != nil {
-		log.Logger().Err(err)
+		log.Logger(ctx).Err(err)
 		return
 	}
 	total = totalResult.Total
@@ -213,7 +213,7 @@ func (d *db) GetItems(ctx context.Context, q *PaginationQuery, searchQuery strin
 //		row := matchResult.Row()
 //		err = row.Fields(&itemSearchResult)
 //		if err != nil {
-//			log.Logger().Err(err)
+//			log.Logger(ctx).Err(err)
 //			return
 //		}
 //		itemSearchResult.ID = row.ID
@@ -221,7 +221,7 @@ func (d *db) GetItems(ctx context.Context, q *PaginationQuery, searchQuery strin
 //		itemSearchResults = append(itemSearchResults, &itemSearchResult)
 //	}
 //	if err = matchResult.Err(); err != nil {
-//		log.Logger().Err(err)
+//		log.Logger(ctx).Err(err)
 //		return
 //	}
 //
@@ -251,9 +251,9 @@ func (d *db) DeleteItem(ctx context.Context, id string) (err error) {
 	_, err = d.collection.Remove(id,
 		&gocb.RemoveOptions{Context: ctx})
 	if err != nil {
-		log.Logger().Err(err)
+		log.Logger(ctx).Err(err)
 		return
 	}
-	log.Logger().Info().Msgf("Item deleted: %s\n", id)
+	log.Logger(ctx).Info().Msgf("Item deleted: %s\n", id)
 	return
 }

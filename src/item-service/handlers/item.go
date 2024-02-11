@@ -14,6 +14,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
+	"golang.org/x/net/context"
 )
 
 type ItemHandler interface {
@@ -31,10 +32,10 @@ type itemHandler struct {
 	apiCounter metric.Int64Counter
 }
 
-func NewItemHandler(bought sql.NullBool) (ItemHandler, error) {
+func NewItemHandler(ctx context.Context, bought sql.NullBool) (ItemHandler, error) {
 	h := &itemHandler{
 		genericHandler: genericHandler{
-			config: config.Get(),
+			config: config.Get(ctx),
 		},
 		bought: bought,
 		tracer: otel.GetTracerProvider().Tracer("ItemHandler"),
@@ -149,16 +150,16 @@ type PaginationQuery struct {
 
 func (h *itemHandler) GetItems(c *gin.Context) {
 	rCtx := c.Request.Context()
-	log.Logger().Info().Msg("GetItemsLog")
 	ctx, span := h.tracer.Start(rCtx, "GetItemsSpan")
 	defer span.End()
+	log.Logger(ctx).Info().Msg("GetItemsLog")
 	defer func() {
 		statusCode := c.Writer.Status()
 		if statusCode >= 400 {
 			span.AddEvent("Failed")
 		}
 	}()
-	log.Logger().Info().Any("id", span.SpanContext().TraceID()).Msg("Span")
+	log.Logger(ctx).Info().Any("id", span.SpanContext().TraceID()).Msg("Span")
 
 	h.apiCounter.Add(ctx, 1)
 

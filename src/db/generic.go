@@ -69,7 +69,7 @@ func (d *db) init(ctx context.Context) error {
 		},
 	})
 	if err != nil {
-		log.Logger().Err(err).Msg("gocb.Connect")
+		log.Logger(ctx).Err(err).Msg("gocb.Connect")
 		return err
 	}
 
@@ -86,7 +86,7 @@ func (d *db) init(ctx context.Context) error {
 		Context: ctx,
 	})
 	if err != nil && !errors.Is(err, gocb.ErrBucketExists) {
-		log.Logger().Err(err).Msg("cluster.Buckets().CreateBucket")
+		log.Logger(ctx).Err(err).Msg("cluster.Buckets().CreateBucket")
 		return err
 	}
 
@@ -96,7 +96,7 @@ func (d *db) init(ctx context.Context) error {
 		Context: ctx,
 	})
 	if err != nil {
-		log.Logger().Err(err).Msg("bucket.WaitUntilReady")
+		log.Logger(ctx).Err(err).Msg("bucket.WaitUntilReady")
 		return err
 	}
 
@@ -106,7 +106,7 @@ func (d *db) init(ctx context.Context) error {
 		&gocb.CreateScopeOptions{Context: ctx})
 	if err != nil {
 		if !errors.Is(err, gocb.ErrScopeExists) {
-			log.Logger().Err(err).Msg("collectionManager.CreateScope")
+			log.Logger(ctx).Err(err).Msg("collectionManager.CreateScope")
 			return err
 		}
 	}
@@ -120,7 +120,7 @@ func (d *db) init(ctx context.Context) error {
 		})
 		if err != nil {
 			if !errors.Is(err, gocb.ErrCollectionExists) {
-				log.Logger().Err(err).Msg("collectionManager.CreateCollection")
+				log.Logger(ctx).Err(err).Msg("collectionManager.CreateCollection")
 				return err
 			}
 		}
@@ -134,7 +134,7 @@ func (d *db) init(ctx context.Context) error {
 			Context:        ctx,
 		}); err != nil {
 			if !errors.Is(err, gocb.ErrIndexExists) {
-				log.Logger().Err(err).Msg("indexManager.CreatePrimaryIndex")
+				log.Logger(ctx).Err(err).Msg("indexManager.CreatePrimaryIndex")
 				return err
 			}
 		}
@@ -147,7 +147,7 @@ func (d *db) init(ctx context.Context) error {
 					Context:        ctx,
 				}); err != nil {
 				if !errors.Is(err, gocb.ErrIndexExists) {
-					log.Logger().Err(err).Msg("indexManager.CreateIndex")
+					log.Logger(ctx).Err(err).Msg("indexManager.CreateIndex")
 					return err
 				}
 			}
@@ -226,7 +226,7 @@ func InitDB(ctx context.Context, cfg *config.Config) (err error) {
 		Valid: true,
 	})
 	if err != nil {
-		log.Logger().Error().Err(err)
+		log.Logger(ctx).Error().Err(err)
 		return
 	}
 	items := []*models.Item{
@@ -5343,7 +5343,7 @@ func InitDB(ctx context.Context, cfg *config.Config) (err error) {
 	for _, item := range items {
 		_, err = itemsDB.UpsertItem(ctx, Key("item", item.Title), item)
 		if err != nil {
-			log.Logger().Error().Err(err)
+			log.Logger(ctx).Error().Err(err)
 			return err
 		}
 	}

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -22,9 +23,9 @@ type genericHandler struct {
 	config *config.Config
 }
 
-func NewGenericHandler() GenericHandler {
+func NewGenericHandler(ctx context.Context) GenericHandler {
 	return &genericHandler{
-		config.Get(),
+		config.Get(ctx),
 	}
 }
 
@@ -42,7 +43,7 @@ func (h *genericHandler) HealthZ(c *gin.Context) {
 		return
 	}
 	t := fmt.Sprintf("%s(%s)@%s: %s\nDB:%s\n", h.config.ServiceName, h.config.HostName, h.config.ServiceVersion, time.Now().Local().Format(time.RFC1123Z), report)
-	log.Logger().Printf("response %s\n", t)
+	log.Logger(ctx).Printf("response %s\n", t)
 	h.res(c, t)
 }
 
@@ -63,10 +64,6 @@ func (h *genericHandler) err(c *gin.Context, message string, err error) {
 
 func (h *genericHandler) errWithStatus(c *gin.Context, status int, message string, err error) {
 	err = c.AbortWithError(status, fmt.Errorf("%s: %w", message, err))
-	if err != nil {
-		log.Logger().Error().Err(err).Msg("error aborting with error")
-		c.Status(500)
-	}
 }
 
 func (h *genericHandler) res(c *gin.Context, data any) {

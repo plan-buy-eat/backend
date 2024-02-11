@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"os"
 	"sync"
 
@@ -23,7 +24,7 @@ type Config struct {
 var instance *Config
 var mu sync.Mutex
 
-func Get() *Config {
+func Get(ctx context.Context) *Config {
 	mu.Lock()
 	defer mu.Unlock()
 	if instance != nil {
@@ -32,7 +33,7 @@ func Get() *Config {
 
 	hostname, err := os.Hostname()
 	if err != nil {
-		log.Logger().Fatal().Err(err).Msg("getting hostname")
+		log.Logger(ctx).Fatal().Err(err).Msg("getting hostname")
 	}
 	instance = &Config{
 		ServiceName:       getValue("SERVICE_NAME", ""),
