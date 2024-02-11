@@ -34,12 +34,13 @@ data:
     [Output]
         Name grafana-loki
         Match *
-        Host loki.default.svc.cluster.local
-        Port 3100
+        # host loki.default.svc.cluster.local
+        # port 3100
+        Url http://loki.default.svc.cluster.local:3100/loki/api/v1/push
         TenantID ""
         BatchWait 1s
         BatchSize 1048576
-        Labels {Service="shoppinglist"}
+        Labels {app="shoppinglist",job="fluent-bit"}
         RemoveKeys kubernetes,stream
         AutoKubernetesLabels false
         # LabelMapPath /fluent-bit/etc/labelmap.json
