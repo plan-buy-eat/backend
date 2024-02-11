@@ -28,7 +28,7 @@ presets:
   # See https://opentelemetry.io/docs/kubernetes/collector/components/#filelog-receiver for details on the receiver.
   logsCollection:
     enabled: false
-    includeCollectorLogs: false
+    includeCollectorLogs: true
     # Enabling this writes checkpoints in /var/lib/otelcol/ host directory.
     # Note this changes collector's user to root, so that it can write to host directory.
     storeCheckpoints: false
@@ -101,7 +101,7 @@ config:
         exporter: true
         job: true   
     zipkin:
-      endpoint: "http://zipkin.default.svc.cluster.local:9411"
+      endpoint: "http://zipkin.default.svc.cluster.local:9411/api/v2/spans"
       # endpoint: "http://zipkin-ui.default.svc.cluster.local:9411"
       tls:
         insecure: true
@@ -110,7 +110,7 @@ config:
     # Without the health_check extension the collector will fail the readiness and liveliness probes.
     # The health_check extension can be modified, but should never be removed.
     health_check:
-      endpoint: ${env:MY_POD_IP}:13133
+      endpoint: 0.0.0.0:13133
     memory_ballast: {}
   processors:
     resource:
@@ -125,17 +125,17 @@ config:
     jaeger:
       protocols:
         grpc:
-          endpoint: ${env:MY_POD_IP}:14250
+          endpoint: 0.0.0.0:14250
         thrift_http:
-          endpoint: ${env:MY_POD_IP}:14268
+          endpoint: 0.0.0.0:14268
         thrift_compact:
-          endpoint: ${env:MY_POD_IP}:6831
+          endpoint: 0.0.0.0:6831
     otlp:
       protocols:
         grpc:
-          endpoint: ${env:MY_POD_IP}:4317
+          endpoint: 0.0.0.0:4317
         http:
-          endpoint: ${env:MY_POD_IP}:4318
+          endpoint: 0.0.0.0:4318
     # prometheus:
     #   config:
     #     scrape_configs:
@@ -143,13 +143,15 @@ config:
     #         scrape_interval: 10s
     #         static_configs:
     #           - targets:
-    #               - ${env:MY_POD_IP}:8888
-    zipkin:
-      endpoint: ${env:MY_POD_IP}:9411
+    #               - 0.0.0.0:8888
+#    zipkin:
+#      endpoint: 0.0.0.0:9411
   service:
     telemetry:
+#      logs:
+#        level: "debug"
       metrics:
-        address: ${env:MY_POD_IP}:8888
+          address: 0.0.0.0:8888
     extensions:
       - health_check
       - memory_ballast
@@ -166,7 +168,7 @@ config:
           - otlp
       metrics:
         exporters:
-          - debug
+#          - debug
           - prometheus
         processors:
           - memory_limiter
@@ -185,9 +187,8 @@ config:
           - resource
         receivers:
           - otlp
-          - jaeger
-          - zipkin
-
+#          - jaeger
+#          - zipkin
 image:
   # If you want to use the core image `otel/opentelemetry-collector`, you also need to change `command.name` value to `otelcol`.
   repository: otel/opentelemetry-collector-contrib
