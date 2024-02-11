@@ -5,6 +5,6 @@ COUCHBASE_BUCKET: default
 SERVICE_VERSION: latest
 DEBUG: false
 SERVICE_NAME: item-service
-REPLICAS: 1
+REPLICAS: 2
 OTEL_COLLECTOR_HOST: my-opentelemetry-collector.default.svc.cluster.local
 # OTEL_COLLECTOR_HOST: otel-collector.default.svc.cluster.local
