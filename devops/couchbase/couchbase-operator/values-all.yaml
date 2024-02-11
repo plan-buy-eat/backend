@@ -656,7 +656,7 @@ buckets:
     # than or equal to 100Mi.  More info:
     # https://kubernetes.io/docs/concepts/configuration/manage-resources-
     # containers/#resource-units-in-kubernetes
-    memoryQuota: 100Mi
+    memoryQuota: 500Mi
     # -- MiniumumDurability defines how durable a document write is by default,
     # and can be made more durable by the client.  This feature enables ACID
     # transactions. When none, Couchbase server will respond when the document
@@ -1147,7 +1147,7 @@ cluster:
     # resource scheduling. More info:
     # https://kubernetes.io/docs/concepts/configuration/manage-resources-
     # containers/#resource-units-in-kubernetes
-    queryServiceMemoryQuota:
+    queryServiceMemoryQuota: 256Mi
     # -- SearchServiceMemQuota is the amount of memory that should be allocated
     # to the search service. This value is per-pod, and only applicable to pods
     # belonging to server classes running the search service.  This field must

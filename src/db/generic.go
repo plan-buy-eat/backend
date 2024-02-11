@@ -69,7 +69,7 @@ func (d *db) init(ctx context.Context) error {
 		},
 	})
 	if err != nil {
-		log.Logger().Err(err)
+		log.Logger().Err(err).Msg("gocb.Connect")
 		return err
 	}
 
@@ -77,13 +77,16 @@ func (d *db) init(ctx context.Context) error {
 
 	err = d.cluster.Buckets().CreateBucket(gocb.CreateBucketSettings{
 		BucketSettings: gocb.BucketSettings{
-			Name: bucketName,
+			Name:         bucketName,
+			RAMQuotaMB:   200,
+			FlushEnabled: true,
+			BucketType:   gocb.CouchbaseBucketType,
 		},
 	}, &gocb.CreateBucketOptions{
 		Context: ctx,
 	})
 	if err != nil && !errors.Is(err, gocb.ErrBucketExists) {
-		log.Logger().Err(err)
+		log.Logger().Err(err).Msg("cluster.Buckets().CreateBucket")
 		return err
 	}
 
@@ -93,7 +96,7 @@ func (d *db) init(ctx context.Context) error {
 		Context: ctx,
 	})
 	if err != nil {
-		log.Logger().Err(err)
+		log.Logger().Err(err).Msg("bucket.WaitUntilReady")
 		return err
 	}
 
@@ -103,7 +106,7 @@ func (d *db) init(ctx context.Context) error {
 		&gocb.CreateScopeOptions{Context: ctx})
 	if err != nil {
 		if !errors.Is(err, gocb.ErrScopeExists) {
-			log.Logger().Err(err)
+			log.Logger().Err(err).Msg("collectionManager.CreateScope")
 			return err
 		}
 	}
@@ -117,7 +120,7 @@ func (d *db) init(ctx context.Context) error {
 		})
 		if err != nil {
 			if !errors.Is(err, gocb.ErrCollectionExists) {
-				log.Logger().Err(err)
+				log.Logger().Err(err).Msg("collectionManager.CreateCollection")
 				return err
 			}
 		}
@@ -131,7 +134,7 @@ func (d *db) init(ctx context.Context) error {
 			Context:        ctx,
 		}); err != nil {
 			if !errors.Is(err, gocb.ErrIndexExists) {
-				log.Logger().Err(err)
+				log.Logger().Err(err).Msg("indexManager.CreatePrimaryIndex")
 				return err
 			}
 		}
@@ -144,7 +147,7 @@ func (d *db) init(ctx context.Context) error {
 					Context:        ctx,
 				}); err != nil {
 				if !errors.Is(err, gocb.ErrIndexExists) {
-					log.Logger().Err(err)
+					log.Logger().Err(err).Msg("indexManager.CreateIndex")
 					return err
 				}
 			}
@@ -214,11 +217,11 @@ func (d *db) Ping(ctx context.Context) (report string, err error) {
 	return string(b), err
 }
 
-func InitDB(ctx context.Context) (err error) {
+func InitDB(ctx context.Context, cfg *config.Config) (err error) {
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
-	itemsDB, err := NewItemsDB(ctx, sql.NullBool{
+	itemsDB, err := NewItemsDB(ctx, cfg, sql.NullBool{
 		Bool:  true,
 		Valid: true,
 	})

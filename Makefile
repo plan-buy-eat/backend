@@ -152,6 +152,15 @@ expose-kube-prometheus-stack-alertmanager:
 	kubectl --namespace monitoring port-forward svc/alertmanager-main 9093
 	# Then access via http://localhost:9093
 
+.PHONY: expose-loki
+expose-loki:
+	kubectl port-forward svc/loki 3000:80
+	# Then access via http://localhost:3000
+
+.PHONY: expose-zipkin
+expose-zipkin:
+	kubectl port-forward svc/zipkin 9411:9411
+	# Then access via http://localhost:9411
 #==================================================================================================
 
 .PHONY: install-traefik
@@ -257,6 +266,31 @@ install-otel-collector:
 	helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
 	helm upgrade --install my-opentelemetry-collector open-telemetry/opentelemetry-collector --set mode=deployment --values devops/otel/opentelemetry-collector/values.yaml
 	# --set mode=<daemonset|deployment|statefulset>
+
+.PHONY: install-loki
+install-loki:
+	helm repo add grafana https://grafana.github.io/helm-charts
+	helm repo update
+	
+	k apply -f devops/loki/sc.yaml   
+	kubectl patch storageclass local-storage -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+	k apply -f devops/loki/pv.yaml 
+	helm upgrade --install loki grafana/loki --values devops/loki/values.yaml 
+
+.PHONY: uninstall-loki
+uninstall-loki:
+	helm uninstall loki
+
+.PHONY: install-zipkin
+install-zipkin:
+	# helm repo add zipkin-helm https://financial-times.github.io/zipkin-helm/docs
+	# helm upgrade --install zipkin-helm zipkin-helm/zipkin-helm
+	k apply -f devops/zipkin/zipkin.yaml
+
+.PHONY: uninstall-zipkin
+uninstall-zipkin:
+	# helm uninstall zipkin-helm 
+	k delete -f devops/zipkin/zipkin.yaml
 
 # .PHONY: install-otel-collector
 # install-otel-collector:

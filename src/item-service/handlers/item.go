@@ -3,15 +3,17 @@ package handlers
 import (
 	"database/sql"
 	"fmt"
+	"net/http"
+	"strconv"
+
 	"github.com/gin-gonic/gin"
 	"github.com/shoppinglist/config"
 	"github.com/shoppinglist/db"
+	"github.com/shoppinglist/log"
 	"github.com/shoppinglist/models"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
-	"net/http"
-	"strconv"
 )
 
 type ItemHandler interface {
@@ -59,9 +61,9 @@ func (h *itemHandler) GetItem(c *gin.Context) {
 	if id == "" {
 		h.errWithStatus(c, http.StatusBadRequest, "bad request", fmt.Errorf("no id specified"))
 	}
-	itemsDB, err := db.NewItemsDB(ctx, h.bought)
+	itemsDB, err := db.NewItemsDB(ctx, h.config, h.bought)
 	if err != nil {
-		h.err(c, "getting db", err)
+		h.err(c, "NewItemsDB", err)
 		return
 	}
 
@@ -81,9 +83,9 @@ func (h *itemHandler) BuyItem(c *gin.Context) {
 	if id == "" {
 		h.errWithStatus(c, http.StatusBadRequest, "bad request", fmt.Errorf("no id specified"))
 	}
-	itemsDB, err := db.NewItemsDB(ctx, h.bought)
+	itemsDB, err := db.NewItemsDB(ctx, h.config, h.bought)
 	if err != nil {
-		h.err(c, "getting db", err)
+		h.err(c, "NewItemsDB", err)
 		return
 	}
 
@@ -102,9 +104,9 @@ func (h *itemHandler) RestoreItem(c *gin.Context) {
 	if id == "" {
 		h.errWithStatus(c, http.StatusBadRequest, "bad request", fmt.Errorf("no id specified"))
 	}
-	itemsDB, err := db.NewItemsDB(ctx, h.bought)
+	itemsDB, err := db.NewItemsDB(ctx, h.config, h.bought)
 	if err != nil {
-		h.err(c, "getting db", err)
+		h.err(c, "NewItemsDB", err)
 		return
 	}
 
@@ -123,9 +125,9 @@ func (h *itemHandler) RestoreItem(c *gin.Context) {
 //	if id == "" {
 //		h.errWithStatus(c, http.StatusBadRequest, "bad request", fmt.Errorf("no id specified"))
 //	}
-//	itemsDB, err := db.NewItemsDB(ctx, h.bought)
+//	itemsDB, err := db.NewItemsDB(ctx, h.config, h.bought)
 //	if err != nil {
-//		h.err(c, "getting db", err)
+//		h.err(c, "NewItemsDB", err)
 //		return
 //	}
 //
@@ -147,7 +149,8 @@ type PaginationQuery struct {
 
 func (h *itemHandler) GetItems(c *gin.Context) {
 	rCtx := c.Request.Context()
-	ctx, span := h.tracer.Start(rCtx, "GetItems")
+	log.Logger().Info().Msg("GetItemsLog")
+	ctx, span := h.tracer.Start(rCtx, "GetItemsSpan")
 	defer span.End()
 	defer func() {
 		statusCode := c.Writer.Status()
@@ -155,6 +158,7 @@ func (h *itemHandler) GetItems(c *gin.Context) {
 			span.AddEvent("Failed")
 		}
 	}()
+	log.Logger().Info().Any("id", span.SpanContext().TraceID()).Msg("Span")
 
 	h.apiCounter.Add(ctx, 1)
 
@@ -167,9 +171,9 @@ func (h *itemHandler) GetItems(c *gin.Context) {
 	}
 
 	c.Header("Content-Type", "application/json")
-	itemsDB, err := db.NewItemsDB(ctx, h.bought)
+	itemsDB, err := db.NewItemsDB(ctx, h.config, h.bought)
 	if err != nil {
-		h.err(c, "getting db", err)
+		h.err(c, "NewItemsDB", err)
 		return
 	}
 

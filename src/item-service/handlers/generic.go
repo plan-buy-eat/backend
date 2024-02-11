@@ -33,7 +33,7 @@ func (h *genericHandler) HealthZ(c *gin.Context) {
 	c.Header("Content-Type", "text/plain")
 	itemsDB, err := db.NewGenericDB(ctx, h.config)
 	if err != nil {
-		h.err(c, "getting db", err)
+		h.err(c, "NewGenericDB", err)
 		return
 	}
 	report, err := itemsDB.Ping(ctx)
@@ -49,9 +49,9 @@ func (h *genericHandler) HealthZ(c *gin.Context) {
 func (h *genericHandler) Init(c *gin.Context) {
 	ctx := c.Request.Context()
 	c.Header("Content-Type", "text/plain")
-	err := db.InitDB(ctx)
+	err := db.InitDB(ctx, h.config)
 	if err != nil {
-		h.err(c, "getting db", err)
+		h.err(c, "init db", err)
 		return
 	}
 	h.res(c, "OK")

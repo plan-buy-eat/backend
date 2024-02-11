@@ -71,3 +71,5 @@ src/item-service/var/log/shoppinglist/item-service.log
 src/item-service/__debug_bin*
 
 *.log
+
+tmp

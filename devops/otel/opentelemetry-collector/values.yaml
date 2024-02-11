@@ -68,14 +68,14 @@ presets:
   # Best used with mode = deployment or statefulset.
   # See https://opentelemetry.io/docs/kubernetes/collector/components/#kubernetes-objects-receiver for details on the receiver.
   kubernetesEvents:
-    enabled: true
+    enabled: false  # !!!
   # Configures the Kubernetes Cluster Receiver to collect cluster-level metrics.
   # Adds the k8s_cluster receiver to the metrics pipeline
   # and adds the necessary rules to ClusteRole.
   # Best used with mode = deployment or statefulset.
   # See https://opentelemetry.io/docs/kubernetes/collector/components/#kubernetes-cluster-receiver for details on the receiver.
   clusterMetrics:
-    enabled: true
+    enabled: false # !!!
 
 configMap:
   # Specifies whether a configMap should be created (true by default)
@@ -90,9 +90,21 @@ config:
       verbosity: detailed
     # Will be removed in a future release.
     # Use the debug exporter instead.
-    logging: {}
+    # logging: {}
     prometheus:
       endpoint: 0.0.0.0:8889
+    loki:
+      endpoint: "http://loki.default.svc.cluster.local:3100/loki/api/v1/push"
+      tls:
+        insecure: true
+      default_labels_enabled:
+        exporter: true
+        job: true   
+    zipkin:
+      endpoint: "http://zipkin.default.svc.cluster.local:9411"
+      # endpoint: "http://zipkin-ui.default.svc.cluster.local:9411"
+      tls:
+        insecure: true
   extensions:
     # The health_check extension is mandatory for this chart.
     # Without the health_check extension the collector will fail the readiness and liveliness probes.
@@ -101,6 +113,11 @@ config:
       endpoint: ${env:MY_POD_IP}:13133
     memory_ballast: {}
   processors:
+    resource:
+      attributes:
+        - action: insert
+          key: loki.resource.labels
+          value: service.name, k8s.container.name, k8s.namespace.name, k8s.pod.name
     batch: {}
     # If set to null, will be overridden with values based on k8s resource limits
     memory_limiter: null
@@ -119,14 +136,14 @@ config:
           endpoint: ${env:MY_POD_IP}:4317
         http:
           endpoint: ${env:MY_POD_IP}:4318
-    prometheus:
-      config:
-        scrape_configs:
-          - job_name: opentelemetry-collector
-            scrape_interval: 10s
-            static_configs:
-              - targets:
-                  - ${env:MY_POD_IP}:8888
+    # prometheus:
+    #   config:
+    #     scrape_configs:
+    #       - job_name: opentelemetry-collector
+    #         scrape_interval: 10s
+    #         static_configs:
+    #           - targets:
+    #               - ${env:MY_POD_IP}:8888
     zipkin:
       endpoint: ${env:MY_POD_IP}:9411
   service:
@@ -140,9 +157,11 @@ config:
       logs:
         exporters:
           - debug
+          - loki
         processors:
           - memory_limiter
           - batch
+          - resource
         receivers:
           - otlp
       metrics:
@@ -152,15 +171,18 @@ config:
         processors:
           - memory_limiter
           - batch
+          - resource
         receivers:
           - otlp
-          - prometheus
+          # - prometheus
       traces:
         exporters:
           - debug
+          - zipkin
         processors:
           - memory_limiter
           - batch
+          - resource
         receivers:
           - otlp
           - jaeger
@@ -295,11 +317,11 @@ ports:
     protocol: TCP
 
 # Resource limits & requests. Update according to your own use case as these values might be too low for a typical deployment.
-resources: {}
-# resources:
-#   limits:
-#     cpu: 250m
-#     memory: 512Mi
+# resources: {}
+resources:
+  limits:
+    cpu: 512m
+    memory: 1024Mi
 
 podAnnotations: {}
 

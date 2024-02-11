@@ -646,7 +646,7 @@ buckets:
     # than or equal to 100Mi.  More info:
     # https://kubernetes.io/docs/concepts/configuration/manage-resources-
     # containers/#resource-units-in-kubernetes
-    memoryQuota: 100Mi
+    memoryQuota: 200Mi
     # -- Replicas defines how many copies of documents Couchbase server
     # maintains.  This directly affects how fault tolerant a Couchbase cluster
     # is.  With a single replica, the cluster can tolerate one data pod going

@@ -4,12 +4,14 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/couchbase/gocb/v2"
-	"github.com/rs/xid"
-	"github.com/shoppinglist/log"
-	"github.com/shoppinglist/models"
 	"strings"
 	"time"
+
+	"github.com/couchbase/gocb/v2"
+	"github.com/rs/xid"
+	"github.com/shoppinglist/config"
+	"github.com/shoppinglist/log"
+	"github.com/shoppinglist/models"
 )
 
 type ItemsDB interface {
@@ -21,11 +23,12 @@ type ItemsDB interface {
 	BuyItem(ctx context.Context, id string, bought bool) (err error)
 }
 
-func NewItemsDB(ctx context.Context, bought sql.NullBool) (ItemsDB, error) {
+func NewItemsDB(ctx context.Context, cfg *config.Config, bought sql.NullBool) (ItemsDB, error) {
 	db := &db{
 		collectionName: "items",
 		fields:         []string{"title", "amount", "unit", "bought", "shop"},
 		bought:         bought,
+		cfg:            cfg,
 	}
 	err := db.init(ctx)
 	if err != nil {
