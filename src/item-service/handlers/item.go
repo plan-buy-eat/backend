@@ -11,9 +11,8 @@ import (
 	"github.com/shoppinglist/db"
 	"github.com/shoppinglist/log"
 	"github.com/shoppinglist/models"
-	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
-	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/net/context"
 )
 
@@ -27,23 +26,21 @@ type ItemHandler interface {
 type itemHandler struct {
 	genericHandler
 	bought     sql.NullBool
-	tracer     trace.Tracer
-	meter      metric.Meter
+	label      string
 	apiCounter metric.Int64Counter
 }
 
-func NewItemHandler(ctx context.Context, bought sql.NullBool) (ItemHandler, error) {
+func NewItemHandler(ctx context.Context, label string, bought sql.NullBool) (ItemHandler, error) {
 	h := &itemHandler{
 		genericHandler: genericHandler{
 			config: config.Get(ctx),
 		},
+		label:  label,
 		bought: bought,
-		tracer: otel.GetTracerProvider().Tracer("ItemHandler"),
-		meter:  otel.Meter("ItemHandler"),
 	}
 
 	var err error
-	h.apiCounter, err = h.meter.Int64Counter(
+	h.apiCounter, err = h.config.Meter.Int64Counter(
 		"api.counter",
 		metric.WithDescription("Number of API calls."),
 		metric.WithUnit("{call}"),
@@ -57,7 +54,6 @@ func NewItemHandler(ctx context.Context, bought sql.NullBool) (ItemHandler, erro
 
 func (h *itemHandler) GetItem(c *gin.Context) {
 	ctx := c.Request.Context()
-	c.Header("Content-Type", "application/json")
 	id := c.Param("id")
 	if id == "" {
 		h.errWithStatus(c, http.StatusBadRequest, "bad request", fmt.Errorf("no id specified"))
@@ -79,7 +75,6 @@ func (h *itemHandler) GetItem(c *gin.Context) {
 
 func (h *itemHandler) BuyItem(c *gin.Context) {
 	ctx := c.Request.Context()
-	c.Header("Content-Type", "application/json")
 	id := c.Param("id")
 	if id == "" {
 		h.errWithStatus(c, http.StatusBadRequest, "bad request", fmt.Errorf("no id specified"))
@@ -100,7 +95,6 @@ func (h *itemHandler) BuyItem(c *gin.Context) {
 
 func (h *itemHandler) RestoreItem(c *gin.Context) {
 	ctx := c.Request.Context()
-	c.Header("Content-Type", "application/json")
 	id := c.Param("id")
 	if id == "" {
 		h.errWithStatus(c, http.StatusBadRequest, "bad request", fmt.Errorf("no id specified"))
@@ -121,7 +115,6 @@ func (h *itemHandler) RestoreItem(c *gin.Context) {
 
 //func (h *itemHandler) DeleteItem(c *gin.Context) {
 //	ctx := c.Request.Context()
-//	c.Header("Content-Type", "application/json")
 //	id := c.Param("id")
 //	if id == "" {
 //		h.errWithStatus(c, http.StatusBadRequest, "bad request", fmt.Errorf("no id specified"))
@@ -149,9 +142,10 @@ type PaginationQuery struct {
 }
 
 func (h *itemHandler) GetItems(c *gin.Context) {
-	rCtx := c.Request.Context()
-	ctx, span := h.tracer.Start(rCtx, "GetItemsSpan")
+	ctx := c.Request.Context()
+	ctx, span := h.config.Tracer.Start(ctx, "GetItemsSpan")
 	defer span.End()
+	span.SetAttributes(attribute.String("handlerLabel", h.label))
 	log.Logger(ctx).Info().Msg("GetItemsLog")
 	defer func() {
 		statusCode := c.Writer.Status()
@@ -161,7 +155,8 @@ func (h *itemHandler) GetItems(c *gin.Context) {
 	}()
 	log.Logger(ctx).Info().Any("id", span.SpanContext().TraceID()).Msg("Span")
 
-	h.apiCounter.Add(ctx, 1)
+	h.apiCounter.Add(ctx, 1,
+		metric.WithAttributes(attribute.String("handlerLabel", h.label)))
 
 	span.AddEvent("Started")
 
@@ -171,7 +166,6 @@ func (h *itemHandler) GetItems(c *gin.Context) {
 		return
 	}
 
-	c.Header("Content-Type", "application/json")
 	itemsDB, err := db.NewItemsDB(ctx, h.config, h.bought)
 	if err != nil {
 		h.err(c, "NewItemsDB", err)

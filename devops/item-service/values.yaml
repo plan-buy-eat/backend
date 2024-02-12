@@ -8,3 +8,5 @@ SERVICE_NAME: item-service
 REPLICAS: 2
 OTEL_COLLECTOR_HOST: my-opentelemetry-collector.default.svc.cluster.local
 # OTEL_COLLECTOR_HOST: otel-collector.default.svc.cluster.local
+COUCHBASE_RAM_QUOTA_MB: 200
+PORT: 80

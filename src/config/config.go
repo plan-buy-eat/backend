@@ -6,6 +6,9 @@ import (
 	"sync"
 
 	"github.com/shoppinglist/log"
+
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type Config struct {
@@ -19,6 +22,10 @@ type Config struct {
 	CouchbaseBucketName       string
 	CouchbaseUsername         string
 	CouchbasePassword         string
+	CouchbaseRamQuotaMB       string
+
+	Tracer trace.Tracer
+	Meter  metric.Meter
 }
 
 var instance *Config
@@ -47,6 +54,7 @@ func Get(ctx context.Context) *Config {
 		CouchbaseBucketName:       getValue("COUCHBASE_BUCKET", ""),
 		CouchbaseUsername:         getValue("COUCHBASE_USERNAME", ""),
 		CouchbasePassword:         getValue("COUCHBASE_PASSWORD", ""),
+		CouchbaseRamQuotaMB:       getValue("COUCHBASE_RAM_QUOTA_MB", "200"),
 	}
 
 	return instance

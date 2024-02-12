@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/couchbase/gocb/v2"
@@ -19,6 +20,7 @@ type GenericDB interface {
 }
 
 type db struct {
+	label              string
 	cluster            *gocb.Cluster
 	collectionManager  *gocb.CollectionManager
 	searchIndexManager *gocb.SearchIndexManager
@@ -34,14 +36,15 @@ type db struct {
 	cfg *config.Config
 }
 
-func NewGenericDB(ctx context.Context, cfg *config.Config) (GenericDB, error) {
+func NewGenericDB(ctx context.Context, label string, cfg *config.Config) (GenericDB, error) {
 	db := &db{
 		fields: []string{"title", "amount", "unit", "bought", "shop"},
 		bought: sql.NullBool{
 			Bool:  false,
 			Valid: false,
 		},
-		cfg: cfg,
+		cfg:   cfg,
+		label: label,
 	}
 	err := db.init(ctx)
 	if err != nil {
@@ -74,20 +77,35 @@ func (d *db) init(ctx context.Context) error {
 	}
 
 	d.searchIndexManager = d.cluster.SearchIndexes()
+	if err != nil {
+		log.Logger(ctx).Err(err).Msg("d.cluster.SearchIndexes")
+		return err
+	}
 
-	err = d.cluster.Buckets().CreateBucket(gocb.CreateBucketSettings{
-		BucketSettings: gocb.BucketSettings{
-			Name:         bucketName,
-			RAMQuotaMB:   200,
-			FlushEnabled: true,
-			BucketType:   gocb.CouchbaseBucketType,
-		},
-	}, &gocb.CreateBucketOptions{
+	tmpBucket := d.cluster.Bucket(bucketName)
+	err = tmpBucket.WaitUntilReady(5*time.Second, &gocb.WaitUntilReadyOptions{
 		Context: ctx,
 	})
-	if err != nil && !errors.Is(err, gocb.ErrBucketExists) {
-		log.Logger(ctx).Err(err).Msg("cluster.Buckets().CreateBucket")
-		return err
+	if err != nil {
+		RAMQuotaMB, err := strconv.Atoi(d.cfg.CouchbaseRamQuotaMB)
+		if err != nil {
+			log.Logger(ctx).Err(err).Msg("RAMQuotaMB")
+			return err
+		}
+		err = d.cluster.Buckets().CreateBucket(gocb.CreateBucketSettings{
+			BucketSettings: gocb.BucketSettings{
+				Name:         bucketName,
+				RAMQuotaMB:   uint64(RAMQuotaMB),
+				FlushEnabled: true,
+				BucketType:   gocb.CouchbaseBucketType,
+			},
+		}, &gocb.CreateBucketOptions{
+			Context: ctx,
+		})
+		if err != nil && !errors.Is(err, gocb.ErrBucketExists) {
+			log.Logger(ctx).Err(err).Msg("cluster.Buckets().CreateBucket")
+			return err
+		}
 	}
 
 	d.bucket = d.cluster.Bucket(bucketName)

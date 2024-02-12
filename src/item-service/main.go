@@ -27,28 +27,15 @@ import (
 	"time"
 )
 
-func ErrorHandler() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		ctx := c.Request.Context()
-		c.Status(http.StatusOK)
-		c.Next()
-		for _, err := range c.Errors {
-			log.Logger(ctx).Err(err).Msg("error while processing request")
-		}
-		if len(c.Errors) > 0 && c.Writer.Status() == http.StatusOK {
-			c.JSON(http.StatusInternalServerError, "Internal Server Error")
-		}
-	}
-}
-
 func main() {
-	// zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-	// log.Logger(ctx).Info().Any("env", os.Environ()).Msgf("Env")
 
 	//// Handle SIGINT (CTRL+C) gracefully.
 	//ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	//defer stop()
 	ctx := context.Background()
+
+	// zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+	log.Logger(ctx).Info().Any("env", os.Environ()).Msgf("Env")
 
 	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
@@ -58,7 +45,7 @@ func main() {
 	log.Logger(ctx).Info().Msgf("Starting %s\n", t)
 
 	// Set up OpenTelemetry.
-	otelShutdown, err := otel.SetupOTelSDK(ctx, c.OtelCollectorHost)
+	tracer, meter, otelShutdown, err := otel.SetupOTelSDK(ctx, c)
 	if err != nil {
 		log.Logger(ctx).Fatal().Err(err).Msg("SetupOTelSDK")
 		time.Sleep(time.Minute)
@@ -69,6 +56,8 @@ func main() {
 		err = errors.Join(err, otelShutdown(context.Background()))
 		log.Logger(ctx).Fatal().Err(err).Msg("otelShutdown")
 	}()
+	c.Tracer = tracer
+	c.Meter = meter
 
 	port := c.Port
 	listenAddress := "0.0.0.0:" + port
@@ -101,7 +90,7 @@ func main() {
 		//},
 		MaxAge: 12 * time.Hour,
 	}))
-	r.Use(ErrorHandler())
+	r.Use(handlers.ErrorHandler())
 
 	// r.Use(otelgin.Middleware(c.ServiceName))
 
@@ -116,26 +105,46 @@ func main() {
 	r.GET("/init", genericHandler.Init)
 	r.GET("/healthz", genericHandler.HealthZ)
 
-	toBuyHandler, err := handlers.NewItemHandler(ctx, sql.NullBool{
-		Bool:  false,
-		Valid: true,
-	})
+	toBuyHandler, err := handlers.NewItemHandler(ctx,
+		"toBuy",
+		sql.NullBool{
+			Bool:  false,
+			Valid: true,
+		})
+	if err != nil {
+		log.Logger(ctx).Fatal().Err(err).Msg("ToBuyHandler")
+	}
 	toBuy := r.Group("/tobuy")
 	toBuy.GET("", toBuyHandler.GetItems)
 	toBuy.GET("/:id", toBuyHandler.GetItem)
 	toBuy.DELETE("/:id", toBuyHandler.BuyItem)
 
-	boughtHandler, err := handlers.NewItemHandler(ctx, sql.NullBool{
-		Bool:  true,
-		Valid: true,
-	})
+	boughtHandler, err := handlers.NewItemHandler(ctx,
+		"bought",
+		sql.NullBool{
+			Bool:  true,
+			Valid: true,
+		})
 	if err != nil {
-		log.Logger(ctx).Fatal().Err(err).Msg("NewItemHandler")
+		log.Logger(ctx).Fatal().Err(err).Msg("BoughtHandler")
 	}
 	bought := r.Group("/bought")
 	bought.GET("", boughtHandler.GetItems)
 	bought.GET("/:id", boughtHandler.GetItem)
 	bought.DELETE("/:id", boughtHandler.RestoreItem)
+
+	allItemsHandler, err := handlers.NewItemHandler(ctx,
+		"allItems",
+		sql.NullBool{
+			Valid: false,
+		})
+	if err != nil {
+		log.Logger(ctx).Fatal().Err(err).Msg("AllItemsHandler")
+	}
+	allItems := r.Group("/items")
+	allItems.GET("", allItemsHandler.GetItems)
+	allItems.GET("/:id", allItemsHandler.GetItem)
+	allItems.DELETE("/:id", allItemsHandler.RestoreItem)
 
 	srv := &http.Server{
 		Addr:    listenAddress,

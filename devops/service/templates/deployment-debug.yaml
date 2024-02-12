@@ -58,6 +58,10 @@ spec:
             value: {{ .Values.SERVICE_VERSION }}
           - name: "OTEL_COLLECTOR_HOST"
             value: {{ .Values.OTEL_COLLECTOR_HOST }}
+          - name: "PORT"
+            value: "{{ .Values.PORT }}"
+          - name: "COUCHBASE_RAM_QUOTA_MB"
+            value: "{{ .Values.COUCHBASE_RAM_QUOTA_MB }}",
         volumes:
           - name: log-volume
             emptyDir: {}

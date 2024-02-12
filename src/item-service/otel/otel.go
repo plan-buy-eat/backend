@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/shoppinglist/config"
 	"github.com/shoppinglist/log"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/exporters/stdout/stdoutmetric"
@@ -17,11 +18,15 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/trace"
+
+	metric2 "go.opentelemetry.io/otel/metric"
+	trace2 "go.opentelemetry.io/otel/trace"
 )
 
 // SetupOTelSDK bootstraps the OpenTelemetry pipeline.
 // If it does not return an error, make sure to call shutdown for proper cleanup.
-func SetupOTelSDK(ctx context.Context, otelCollectorHost string) (shutdown func(context.Context) error, err error) {
+func SetupOTelSDK(ctx context.Context, config *config.Config,
+) (tracer trace2.Tracer, meter metric2.Meter, shutdown func(context.Context) error, err error) {
 	var shutdownFuncs []func(context.Context) error
 
 	// shutdown calls cleanup functions registered via shutdownFuncs.
@@ -46,7 +51,7 @@ func SetupOTelSDK(ctx context.Context, otelCollectorHost string) (shutdown func(
 	otel.SetTextMapPropagator(prop)
 
 	// Set up trace provider.
-	tracerProvider, err := newTraceProvider(ctx, otelCollectorHost)
+	tracerProvider, err := newTraceProvider(ctx, config.OtelCollectorHost)
 	if err != nil {
 		handleErr(err)
 		return
@@ -55,13 +60,16 @@ func SetupOTelSDK(ctx context.Context, otelCollectorHost string) (shutdown func(
 	otel.SetTracerProvider(tracerProvider)
 
 	// Set up meter provider.
-	meterProvider, err := newMeterProvider(ctx, otelCollectorHost)
+	meterProvider, err := newMeterProvider(ctx, config.OtelCollectorHost)
 	if err != nil {
 		handleErr(err)
 		return
 	}
 	shutdownFuncs = append(shutdownFuncs, meterProvider.Shutdown)
 	otel.SetMeterProvider(meterProvider)
+
+	tracer = otel.GetTracerProvider().Tracer(config.ServiceName)
+	meter = otel.Meter(config.ServiceName)
 
 	return
 }

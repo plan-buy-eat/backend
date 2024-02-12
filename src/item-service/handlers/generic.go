@@ -32,7 +32,7 @@ func NewGenericHandler(ctx context.Context) GenericHandler {
 func (h *genericHandler) HealthZ(c *gin.Context) {
 	ctx := c.Request.Context()
 	c.Header("Content-Type", "text/plain")
-	itemsDB, err := db.NewGenericDB(ctx, h.config)
+	itemsDB, err := db.NewGenericDB(ctx, "generic", h.config)
 	if err != nil {
 		h.err(c, "NewGenericDB", err)
 		return
@@ -88,4 +88,19 @@ func (h *genericHandler) resWithStatus(c *gin.Context, status int, data any) {
 		return
 	}
 	c.Status(status)
+}
+
+func ErrorHandler() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ctx := c.Request.Context()
+		c.Header("Content-Type", "application/json")
+		c.Status(http.StatusOK)
+		c.Next()
+		for _, err := range c.Errors {
+			log.Logger(ctx).Err(err).Msg("error while processing request")
+		}
+		if len(c.Errors) > 0 && c.Writer.Status() == http.StatusOK {
+			c.JSON(http.StatusInternalServerError, "Internal Server Error")
+		}
+	}
 }

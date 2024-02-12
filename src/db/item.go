@@ -12,6 +12,7 @@ import (
 	"github.com/shoppinglist/config"
 	"github.com/shoppinglist/log"
 	"github.com/shoppinglist/models"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 type ItemsDB interface {
@@ -109,6 +110,11 @@ func (d *db) BuyItem(ctx context.Context, id string, bought bool) (err error) {
 }
 
 func (d *db) GetItems(ctx context.Context, q *PaginationQuery, searchQuery string) (items []*models.ItemWithID, total int, err error) {
+
+	ctx, span := d.cfg.Tracer.Start(ctx, "DBGetItemsSpan")
+	defer span.End()
+	span.SetAttributes(attribute.String("dbLabel", d.label))
+	log.Logger(ctx).Info().Msg("GetItemsLog")
 
 	searchQuery = strings.TrimSpace(searchQuery)
 
