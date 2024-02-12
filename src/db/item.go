@@ -25,11 +25,20 @@ type ItemsDB interface {
 }
 
 func NewItemsDB(ctx context.Context, cfg *config.Config, bought sql.NullBool) (ItemsDB, error) {
+	label := "items"
+	if bought.Valid {
+		if bought.Bool {
+			label = "bought"
+		} else {
+			label = "toBuy"
+		}
+	}
 	db := &db{
 		collectionName: "items",
 		fields:         []string{"title", "amount", "unit", "bought", "shop"},
 		bought:         bought,
 		cfg:            cfg,
+		label:          label,
 	}
 	err := db.init(ctx)
 	if err != nil {
