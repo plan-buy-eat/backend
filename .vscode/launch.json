@@ -15,8 +15,8 @@
           "OTEL_COLLECTOR_HOST":"localhost",
           "SERVICE_NAME": "item-service",
           "PORT":"81",
-          "COUCHBASE_RAM_QUOTA_MB": "100",
-        },
+          "COUCHBASE_RAM_QUOTA_MB": "100"
+        }
       }
     ]
   }
