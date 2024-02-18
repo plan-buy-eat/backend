@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"net/http"
@@ -13,7 +14,6 @@ import (
 	"github.com/shoppinglist/models"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
-	"golang.org/x/net/context"
 )
 
 type ItemHandler interface {
@@ -26,7 +26,6 @@ type ItemHandler interface {
 type itemHandler struct {
 	genericHandler
 	bought     sql.NullBool
-	label      string
 	apiCounter metric.Int64Counter
 }
 
@@ -34,8 +33,8 @@ func NewItemHandler(ctx context.Context, label string, bought sql.NullBool) (Ite
 	h := &itemHandler{
 		genericHandler: genericHandler{
 			config: config.Get(ctx),
+			label:  label,
 		},
-		label:  label,
 		bought: bought,
 	}
 
@@ -53,7 +52,9 @@ func NewItemHandler(ctx context.Context, label string, bought sql.NullBool) (Ite
 }
 
 func (h *itemHandler) GetItem(c *gin.Context) {
-	ctx := c.Request.Context()
+	ctx, _, _, def := h.start(c, log.GetFuncName())
+	defer def()
+	log.Logger(ctx).Info().Msg("Start")
 	id := c.Param("id")
 	if id == "" {
 		h.errWithStatus(c, http.StatusBadRequest, "bad request", fmt.Errorf("no id specified"))
@@ -74,7 +75,9 @@ func (h *itemHandler) GetItem(c *gin.Context) {
 }
 
 func (h *itemHandler) BuyItem(c *gin.Context) {
-	ctx := c.Request.Context()
+	ctx, _, _, def := h.start(c, log.GetFuncName())
+	defer def()
+	log.Logger(ctx).Info().Msg("Start")
 	id := c.Param("id")
 	if id == "" {
 		h.errWithStatus(c, http.StatusBadRequest, "bad request", fmt.Errorf("no id specified"))
@@ -94,7 +97,9 @@ func (h *itemHandler) BuyItem(c *gin.Context) {
 }
 
 func (h *itemHandler) RestoreItem(c *gin.Context) {
-	ctx := c.Request.Context()
+	ctx, _, _, def := h.start(c, log.GetFuncName())
+	defer def()
+	log.Logger(ctx).Info().Msg("Start")
 	id := c.Param("id")
 	if id == "" {
 		h.errWithStatus(c, http.StatusBadRequest, "bad request", fmt.Errorf("no id specified"))
@@ -113,25 +118,26 @@ func (h *itemHandler) RestoreItem(c *gin.Context) {
 	h.resWithStatus(c, http.StatusOK, models.ID{ID: id})
 }
 
-//func (h *itemHandler) DeleteItem(c *gin.Context) {
-//	ctx := c.Request.Context()
-//	id := c.Param("id")
-//	if id == "" {
-//		h.errWithStatus(c, http.StatusBadRequest, "bad request", fmt.Errorf("no id specified"))
-//	}
-//	itemsDB, err := db.NewItemsDB(ctx, h.config, h.bought)
-//	if err != nil {
-//		h.err(c, "NewItemsDB", err)
-//		return
-//	}
-//
-//	err = itemsDB.DeleteItem(ctx, id)
-//	if err != nil {
-//		h.err(c, "getting an item", err)
-//		return
-//	}
-//	h.resWithStatus(c, http.StatusNoContent, nil)
-//}
+func (h *itemHandler) DeleteItem(c *gin.Context) {
+	ctx, _, _, def := h.start(c, log.GetFuncName())
+	defer def()
+	id := c.Param("id")
+	if id == "" {
+		h.errWithStatus(c, http.StatusBadRequest, "bad request", fmt.Errorf("no id specified"))
+	}
+	itemsDB, err := db.NewItemsDB(ctx, h.config, h.bought)
+	if err != nil {
+		h.err(c, "NewItemsDB", err)
+		return
+	}
+
+	err = itemsDB.DeleteItem(ctx, id)
+	if err != nil {
+		h.err(c, "getting an item", err)
+		return
+	}
+	h.resWithStatus(c, http.StatusNoContent, nil)
+}
 
 type PaginationQuery struct {
 	Start int    `form:"_start"`
@@ -142,18 +148,8 @@ type PaginationQuery struct {
 }
 
 func (h *itemHandler) GetItems(c *gin.Context) {
-	ctx := c.Request.Context()
-	ctx, span := h.config.Tracer.Start(ctx, "GetItemsSpan")
-	defer span.End()
-	span.SetAttributes(attribute.String("handlerLabel", h.label))
-	log.Logger(ctx).Info().Msg("GetItemsLog")
-	defer func() {
-		statusCode := c.Writer.Status()
-		if statusCode >= 400 {
-			span.AddEvent("Failed")
-		}
-	}()
-	log.Logger(ctx).Info().Any("id", span.SpanContext().TraceID()).Msg("Span")
+	ctx, span, _, def := h.start(c, log.GetFuncName())
+	defer def()
 
 	h.apiCounter.Add(ctx, 1,
 		metric.WithAttributes(attribute.String("handlerLabel", h.label)))
@@ -186,8 +182,6 @@ func (h *itemHandler) GetItems(c *gin.Context) {
 	}
 	c.Header("X-Total-Count", strconv.Itoa(total))
 	h.res(c, itemsOut)
-
-	span.AddEvent("Succeeded")
 
 	c.Status(http.StatusOK)
 }

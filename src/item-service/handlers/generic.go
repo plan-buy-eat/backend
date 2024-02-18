@@ -2,8 +2,12 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"net/http"
 	"time"
 
@@ -21,23 +25,25 @@ type GenericHandler interface {
 
 type genericHandler struct {
 	config *config.Config
+	label  string
 }
 
 func NewGenericHandler(ctx context.Context) GenericHandler {
 	return &genericHandler{
 		config.Get(ctx),
+		"generic",
 	}
 }
 
 func (h *genericHandler) HealthZ(c *gin.Context) {
 	ctx := c.Request.Context()
 	c.Header("Content-Type", "text/plain")
-	itemsDB, err := db.NewGenericDB(ctx, "generic", h.config)
+	genericDB, err := db.NewGenericDB(ctx, "generic", h.config)
 	if err != nil {
 		h.err(c, "NewGenericDB", err)
 		return
 	}
-	report, err := itemsDB.Ping(ctx)
+	report, err := genericDB.Ping(ctx)
 	if err != nil {
 		h.err(c, "pinging db", err)
 		return
@@ -50,7 +56,14 @@ func (h *genericHandler) HealthZ(c *gin.Context) {
 func (h *genericHandler) Init(c *gin.Context) {
 	ctx := c.Request.Context()
 	c.Header("Content-Type", "text/plain")
-	err := db.InitDB(ctx, h.config)
+	itemsDB, err := db.NewItemsDB(ctx, h.config, sql.NullBool{
+		Valid: false,
+	})
+	if err != nil {
+		h.err(c, "NewItemsDB", err)
+		return
+	}
+	err = itemsDB.InitDB(ctx)
 	if err != nil {
 		h.err(c, "init db", err)
 		return
@@ -88,6 +101,25 @@ func (h *genericHandler) resWithStatus(c *gin.Context, status int, data any) {
 		return
 	}
 	c.Status(status)
+}
+
+func (h *genericHandler) start(c *gin.Context, funcName string) (context.Context, trace.Span, zerolog.Logger, func()) {
+	ctx := c.Request.Context()
+	ctx, span := h.config.Tracer.Start(ctx, funcName)
+	span.SetAttributes(attribute.String("handlerLabel", h.label))
+	span.AddEvent("Started")
+	l := log.Logger(ctx).With().Any("handlerLabel", h.label).Logger()
+
+	f := func() {
+		span.End()
+		statusCode := c.Writer.Status()
+		if statusCode >= 400 {
+			span.AddEvent("Failed")
+		} else {
+			span.AddEvent("Succeeded")
+		}
+	}
+	return ctx, span, l, f
 }
 
 func ErrorHandler() gin.HandlerFunc {

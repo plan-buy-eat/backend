@@ -3,6 +3,8 @@ package otel
 import (
 	"context"
 	"errors"
+	"go.opentelemetry.io/otel/sdk/resource"
+	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 	"time"
 
 	"github.com/shoppinglist/config"
@@ -51,7 +53,7 @@ func SetupOTelSDK(ctx context.Context, config *config.Config,
 	otel.SetTextMapPropagator(prop)
 
 	// Set up trace provider.
-	tracerProvider, err := newTraceProvider(ctx, config.OtelCollectorHost)
+	tracerProvider, err := newTraceProvider(ctx, config)
 	if err != nil {
 		handleErr(err)
 		return
@@ -60,7 +62,7 @@ func SetupOTelSDK(ctx context.Context, config *config.Config,
 	otel.SetTracerProvider(tracerProvider)
 
 	// Set up meter provider.
-	meterProvider, err := newMeterProvider(ctx, config.OtelCollectorHost)
+	meterProvider, err := newMeterProvider(ctx, config)
 	if err != nil {
 		handleErr(err)
 		return
@@ -81,32 +83,31 @@ func newPropagator() propagation.TextMapPropagator {
 	)
 }
 
-func newTraceProvider(ctx context.Context, otelCollectorHost string) (*trace.TracerProvider, error) {
-	useStdout := false
+func newTraceProvider(ctx context.Context, cfg *config.Config) (*trace.TracerProvider, error) {
 	var conn *grpc.ClientConn
 	var err error
-	if otelCollectorHost != "" {
-		log.Logger(ctx).Info().Str("address", otelCollectorHost+":4317").Msg("connecting to trace collector")
-		conn, err = grpc.DialContext(ctx, otelCollectorHost+":4317",
+	if cfg.OtelCollectorHost != "" {
+		log.Logger(ctx).Info().Str("address", cfg.OtelCollectorHost+":4317").Msg("connecting to trace collector")
+		conn, err = grpc.DialContext(ctx, cfg.OtelCollectorHost+":4317",
 			// Note the use of insecure transport here. TLS is recommended in production.
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
 			grpc.WithBlock(),
 		)
 		if err != nil {
 			log.Logger(ctx).Err(err).Msg("failed to create gRPC connection to collector")
-			useStdout = true
+			cfg.UseStdout = true
 		}
 	} else {
-		useStdout = true
+		cfg.UseStdout = true
 	}
 
 	// Set up a trace exporter
 	var traceExporter trace.SpanExporter
-	if !useStdout {
+	if !cfg.UseStdout {
 		traceExporter, err = otlptracegrpc.New(ctx, otlptracegrpc.WithGRPCConn(conn))
 		if err != nil {
 			log.Logger(ctx).Err(err).Msg("failed to create trace exporter")
-			useStdout = true
+			cfg.UseStdout = true
 		}
 	}
 	if traceExporter == nil {
@@ -119,31 +120,38 @@ func newTraceProvider(ctx context.Context, otelCollectorHost string) (*trace.Tra
 		}
 	}
 
+	r, err := resource.New(ctx,
+		resource.WithAttributes(semconv.ServiceName(config.Get(ctx).ServiceName)),
+		resource.WithAttributes(semconv.ServiceVersion(config.Get(ctx).ServiceVersion)),
+	)
+	if err != nil {
+		log.Logger(ctx).Err(err).Msg("resource.New")
+		return nil, err
+	}
 	traceProvider := trace.NewTracerProvider(
 		trace.WithBatcher(traceExporter),
+		trace.WithResource(r),
 	)
 	return traceProvider, nil
 }
 
-func newMeterProvider(ctx context.Context, otelCollectorHost string) (*metric.MeterProvider, error) {
-	useStdout := false
-
+func newMeterProvider(ctx context.Context, cfg *config.Config) (*metric.MeterProvider, error) {
 	var metricExporter metric.Exporter
 	var err error
-	if otelCollectorHost != "" {
-		log.Logger(ctx).Info().Str("address", otelCollectorHost+":4317").Msg("connecting to metric collector")
+	if cfg.OtelCollectorHost != "" {
+		log.Logger(ctx).Info().Str("address", cfg.OtelCollectorHost+":4317").Msg("connecting to metric collector")
 		metricExporter, err = otlpmetricgrpc.New(ctx,
 			otlpmetricgrpc.WithInsecure(),
-			otlpmetricgrpc.WithEndpoint(otelCollectorHost+":4317"),
+			otlpmetricgrpc.WithEndpoint(cfg.OtelCollectorHost+":4317"),
 		)
 		if err != nil {
 			log.Logger(ctx).Err(err).Msg("failed to create metric exporter")
-			useStdout = true
+			cfg.UseStdout = true
 		}
 	} else {
-		useStdout = true
+		cfg.UseStdout = true
 	}
-	if useStdout == true || metricExporter == nil {
+	if cfg.UseStdout == true || metricExporter == nil {
 		log.Logger(ctx).Info().Msg("falling back to stdout metric")
 		metricExporter, err = stdoutmetric.New()
 		if err != nil {

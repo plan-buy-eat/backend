@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"golang.org/x/sync/errgroup"
 	"strings"
 	"time"
 
@@ -12,16 +13,15 @@ import (
 	"github.com/shoppinglist/config"
 	"github.com/shoppinglist/log"
 	"github.com/shoppinglist/models"
-	"go.opentelemetry.io/otel/attribute"
 )
 
 type ItemsDB interface {
 	UpsertItem(ctx context.Context, inId string, item *models.Item) (id string, err error)
 	GetItem(ctx context.Context, id string) (item *models.Item, err error)
 	GetItems(ctx context.Context, q *PaginationQuery, searchQuery string) (items []*models.ItemWithID, total int, err error)
-	//SearchItems(ctx context.Context, query string) (items []*models.ItemWithID, err error)
 	DeleteItem(ctx context.Context, id string) (err error)
 	BuyItem(ctx context.Context, id string, bought bool) (err error)
+	InitDB(ctx context.Context) (err error)
 }
 
 func NewItemsDB(ctx context.Context, cfg *config.Config, bought sql.NullBool) (ItemsDB, error) {
@@ -37,7 +37,7 @@ func NewItemsDB(ctx context.Context, cfg *config.Config, bought sql.NullBool) (I
 		collectionName: "items",
 		fields:         []string{"title", "amount", "unit", "bought", "shop"},
 		bought:         bought,
-		cfg:            cfg,
+		config:         cfg,
 		label:          label,
 	}
 	err := db.init(ctx)
@@ -48,6 +48,9 @@ func NewItemsDB(ctx context.Context, cfg *config.Config, bought sql.NullBool) (I
 }
 
 func (d *db) UpsertItem(ctx context.Context, inId string, item *models.Item) (outId string, err error) {
+	ctx, _, _, def := d.start(ctx, log.GetFuncName())
+	defer def()
+
 	outId = inId
 	if outId == "" {
 		outId = xid.New().String()
@@ -72,6 +75,9 @@ func (d *db) UpsertItem(ctx context.Context, inId string, item *models.Item) (ou
 }
 
 func (d *db) GetItem(ctx context.Context, id string) (item *models.Item, err error) {
+	ctx, _, _, def := d.start(ctx, log.GetFuncName())
+	defer def()
+
 	getResult, err := d.collection.Get(id,
 		&gocb.GetOptions{Context: ctx})
 	if err != nil {
@@ -97,6 +103,8 @@ func (d *db) GetItem(ctx context.Context, id string) (item *models.Item, err err
 }
 
 func (d *db) BuyItem(ctx context.Context, id string, bought bool) (err error) {
+	ctx, _, _, def := d.start(ctx, log.GetFuncName())
+	defer def()
 
 	mops := []gocb.MutateInSpec{
 		gocb.ReplaceSpec("bought", bought, &gocb.ReplaceSpecOptions{}),
@@ -119,11 +127,8 @@ func (d *db) BuyItem(ctx context.Context, id string, bought bool) (err error) {
 }
 
 func (d *db) GetItems(ctx context.Context, q *PaginationQuery, searchQuery string) (items []*models.ItemWithID, total int, err error) {
-
-	ctx, span := d.cfg.Tracer.Start(ctx, "DBGetItemsSpan")
-	defer span.End()
-	span.SetAttributes(attribute.String("dbLabel", d.label))
-	log.Logger(ctx).Info().Msg("GetItemsLog")
+	ctx, _, _, def := d.start(ctx, log.GetFuncName())
+	defer def()
 
 	searchQuery = strings.TrimSpace(searchQuery)
 
@@ -148,11 +153,17 @@ func (d *db) GetItems(ctx context.Context, q *PaginationQuery, searchQuery strin
 	if q.Order == "" {
 		q.Order = "ASC"
 	}
-	if q.Sort != "" {
-		query += fmt.Sprintf("\nORDER BY x.%s %s, meta(x).id ASC", q.Sort, q.Order)
-	} else {
-		query += fmt.Sprintf("\nORDER BY meta(x).id ASC")
+
+	query += fmt.Sprintf("\nORDER BY 1=1")
+	if d.bought.Valid {
+		query += fmt.Sprintf(", x.bought asc")
 	}
+	if q.Sort != "" {
+		query += fmt.Sprintf(", x.%s %s, meta(x).id ASC", q.Sort, q.Order)
+	} else {
+		query += fmt.Sprintf(", meta(x).id ASC")
+	}
+
 	if q.Start != 0 {
 		query += fmt.Sprintf("\nOFFSET %d ", q.Start)
 	}
@@ -160,109 +171,74 @@ func (d *db) GetItems(ctx context.Context, q *PaginationQuery, searchQuery strin
 		query += fmt.Sprintf("\nLIMIT %d ", q.End-q.Start)
 	}
 
-	log.Logger(ctx).Info().Msgf("Query: %s", query)
-	params := map[string]interface{}{
-		"searchQuery": searchQuery,
-	}
-	queryResult, err := d.scope.Query(query, &gocb.QueryOptions{Adhoc: true, Context: ctx, NamedParameters: params})
-	if err != nil {
-		log.Logger(ctx).Err(err)
-		return
-	}
-	items = []*models.ItemWithID{}
-	for queryResult.Next() {
-		var item models.ItemWithID
-		err = queryResult.Row(&item)
+	eg, ctx := errgroup.WithContext(ctx)
+
+	eg.Go(func() (err error) {
+		ctx, span := d.config.Tracer.Start(ctx, "main")
+		defer span.End()
+
+		l := log.Logger(ctx).With().Any("query", "main").Logger()
+		l.Info().Msgf("Main query: %s", query)
+		params := map[string]interface{}{
+			"searchQuery": searchQuery,
+		}
+		queryResult, err := d.scope.Query(query, &gocb.QueryOptions{Adhoc: true, Context: ctx, NamedParameters: params})
 		if err != nil {
-			log.Logger(ctx).Err(err)
+			l.Err(err).Msg("Query")
 			return
 		}
-		items = append(items, &item)
-	}
-	if err = queryResult.Err(); err != nil {
-		log.Logger(ctx).Err(err)
+		items = []*models.ItemWithID{}
+		for queryResult.Next() {
+			var item models.ItemWithID
+			err = queryResult.Row(&item)
+			if err != nil {
+				l.Err(err).Msg("Row")
+				return
+			}
+			items = append(items, &item)
+		}
+		if err = queryResult.Err(); err != nil {
+			l.Err(err).Msg("queryResult.Err")
+			return
+		}
 		return
-	}
+	})
 
-	paramsTotal := map[string]interface{}{
-		"searchQuery": searchQuery,
-	}
-	queryResultTotal, err := d.scope.Query(queryTotal, &gocb.QueryOptions{Adhoc: true, Context: ctx, NamedParameters: paramsTotal})
-	if err != nil {
-		log.Logger(ctx).Err(err)
+	eg.Go(func() (err error) {
+		ctx, span := d.config.Tracer.Start(ctx, "total")
+		defer span.End()
+		l := log.Logger(ctx).With().Any("query", "total").Logger()
+
+		l.Info().Msgf("Total query: %s", queryTotal)
+		paramsTotal := map[string]interface{}{
+			"searchQuery": searchQuery,
+		}
+		queryResultTotal, err := d.scope.Query(queryTotal, &gocb.QueryOptions{Adhoc: true, Context: ctx, NamedParameters: paramsTotal})
+		if err != nil {
+			l.Err(err).Msg("Query")
+			return
+		}
+		var totalResult models.Total
+		err = queryResultTotal.One(&totalResult)
+		if err != nil {
+			l.Err(err).Msg("queryResultTotal.One")
+			return
+		}
+		total = totalResult.Total
+		return
+	})
+
+	if err = eg.Wait(); err != nil {
 		return
 	}
-	var totalResult models.Total
-	err = queryResultTotal.One(&totalResult)
-	if err != nil {
-		log.Logger(ctx).Err(err)
-		return
-	}
-	total = totalResult.Total
 
 	return
 }
 
-//func (d *db) SearchItems(ctx context.Context, query string) (items []*models.ItemWithID, err error) {
-//	matchResult, err := d.cluster.SearchQuery(
-//		"title-index",
-//		search.NewConjunctionQuery(
-//			search.NewMatchQuery(query),
-//			//search.NewDateRangeQuery().Start("2019-01-01", true).End("2029-02-01", false),
-//		),
-//		&gocb.SearchOptions{
-//			Limit:   10000,
-//			Fields:  d.fields,
-//			Context: ctx,
-//		},
-//	)
-//	if err != nil {
-//		return nil, err
-//
-//	}
-//
-//	itemSearchResults := make([]*models.ItemSearchResult, 0)
-//	// Print each found Row
-//	for matchResult.Next() {
-//		var itemSearchResult models.ItemSearchResult
-//		row := matchResult.Row()
-//		err = row.Fields(&itemSearchResult)
-//		if err != nil {
-//			log.Logger(ctx).Err(err)
-//			return
-//		}
-//		itemSearchResult.ID = row.ID
-//		itemSearchResult.Score = row.Score
-//		itemSearchResults = append(itemSearchResults, &itemSearchResult)
-//	}
-//	if err = matchResult.Err(); err != nil {
-//		log.Logger(ctx).Err(err)
-//		return
-//	}
-//
-//	slices.SortFunc(itemSearchResults, func(i, j *models.ItemSearchResult) int {
-//		return int(j.Score - i.Score)
-//	})
-//
-//	items = make([]*models.ItemWithID, 0, len(itemSearchResults))
-//	for _, result := range itemSearchResults {
-//		items = append(items, &models.ItemWithID{
-//			Item: models.Item{
-//				Title:  result.Title,
-//				Amount: result.Amount,
-//				Unit:   result.Unit,
-//				Bought: result.Bought,
-//				Shop:   result.Shop,
-//			},
-//			ID: result.ID,
-//		})
-//	}
-//
-//	return
-//
-//}
-
 func (d *db) DeleteItem(ctx context.Context, id string) (err error) {
+	ctx, _, _, def := d.start(ctx, log.GetFuncName())
+	defer def()
+
 	_, err = d.collection.Remove(id,
 		&gocb.RemoveOptions{Context: ctx})
 	if err != nil {

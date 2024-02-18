@@ -5,15 +5,12 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-
 	"github.com/gin-contrib/cors"
-	"github.com/gin-contrib/logger"
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-contrib/requestid"
 	"github.com/gin-gonic/gin"
 	_ "github.com/joho/godotenv/autoload"
 	"github.com/rs/xid"
-	"github.com/rs/zerolog"
 	"github.com/shoppinglist/config"
 	"github.com/shoppinglist/item-service/handlers"
 	"github.com/shoppinglist/item-service/otel"
@@ -64,14 +61,6 @@ func main() {
 	log.Logger(ctx).Info().Msgf("Listening at %s", listenAddress)
 
 	r := gin.New()
-	pprof.Register(r)
-	r.HandleMethodNotAllowed = true
-	r.Use(logger.SetLogger(
-		logger.WithLogger(func(_ *gin.Context, l zerolog.Logger) zerolog.Logger {
-			return l.Output(gin.DefaultWriter).With().Logger()
-		}),
-	))
-	r.Use(gin.Recovery())
 	r.Use(
 		requestid.New(
 			requestid.WithGenerator(func() string {
@@ -79,6 +68,16 @@ func main() {
 			}),
 		),
 	)
+	r.Use(func(c *gin.Context) {
+		ctx := c.Request.Context()
+		ctx = context.WithValue(ctx, "requestId", requestid.Get(c))
+		c.Request = c.Request.WithContext(ctx)
+		c.Next()
+	})
+	pprof.Register(r)
+	r.HandleMethodNotAllowed = true
+	r.Use(LoggerMiddleware)
+	r.Use(gin.Recovery())
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:5173", "https://shoppinglist.turevskiy.kharkiv.ua"},
 		AllowMethods:     []string{"*"},
@@ -179,4 +178,29 @@ func main() {
 		log.Logger(ctx).Info().Msg("timeout of 5 seconds.")
 	}
 	log.Logger(ctx).Info().Msg("server is stopped")
+}
+
+func LoggerMiddleware(c *gin.Context) {
+	path := c.Request.URL.Path
+	raw := c.Request.URL.RawQuery
+	if raw != "" {
+		path = path + "?" + raw
+	}
+	start := time.Now()
+
+	c.Next()
+
+	end := time.Now()
+	latency := end.Sub(start)
+
+	ctx := c.Request.Context()
+	log.Logger(ctx).Info().
+		Int("status", c.Writer.Status()).
+		Str("method", c.Request.Method).
+		Str("path", path).
+		Str("ip", c.ClientIP()).
+		Dur("latency", latency).
+		Str("user_agent", c.Request.UserAgent()).
+		Int("body_size", c.Writer.Size()).
+		Msg("request processed")
 }

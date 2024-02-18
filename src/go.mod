@@ -21,7 +21,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.23.1
 	go.opentelemetry.io/otel/sdk/metric v1.23.1
 	go.opentelemetry.io/otel/trace v1.23.1
-	golang.org/x/net v0.21.0
+	golang.org/x/sync v0.6.0
 	google.golang.org/grpc v1.61.1
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
@@ -64,6 +64,7 @@ require (
 	go.uber.org/zap v1.26.0 // indirect
 	golang.org/x/arch v0.7.0 // indirect
 	golang.org/x/crypto v0.19.0 // indirect
+	golang.org/x/net v0.21.0 // indirect
 	golang.org/x/sys v0.17.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240213162025-012b6fc9bca9 // indirect
@@ -71,3 +72,6 @@ require (
 	google.golang.org/protobuf v1.32.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+//// TODO: remove when https://github.com/gin-contrib/logger/pull/69 is merged
+//replace github.com/gin-contrib/logger v1.0.0 => github.com/mgabeler-lee-6rs/gin-contrib-logger v0.0.0-20231128024918-7cff53ef9854

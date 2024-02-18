@@ -24,6 +24,8 @@ type Config struct {
 	CouchbasePassword         string
 	CouchbaseRamQuotaMB       string
 
+	UseStdout bool
+
 	Tracer trace.Tracer
 	Meter  metric.Meter
 }
@@ -55,6 +57,9 @@ func Get(ctx context.Context) *Config {
 		CouchbaseUsername:         getValue("COUCHBASE_USERNAME", ""),
 		CouchbasePassword:         getValue("COUCHBASE_PASSWORD", ""),
 		CouchbaseRamQuotaMB:       getValue("COUCHBASE_RAM_QUOTA_MB", "200"),
+
+		// hardcoded for now
+		UseStdout: false,
 	}
 
 	return instance

@@ -3,6 +3,7 @@ package log
 import (
 	"context"
 	"os"
+	"runtime"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -27,7 +28,9 @@ func Logger(ctx context.Context) *zerolog.Logger {
 	}
 
 	output := zerolog.MultiLevelWriter(os.Stderr, fileLogger)
-	logger := zerolog.New(output).With().Timestamp().Caller().Str("app", os.Getenv("SERVICE_NAME")).Logger()
+	requestId := ctx.Value("requestId")
+	logger := zerolog.New(output).With().Timestamp().Caller().Str("app", os.Getenv("SERVICE_NAME")).
+		Any("requestId", requestId).Logger()
 
 	logger = logger.Hook(zerologTraceHook(ctx))
 
@@ -91,4 +94,13 @@ func zerologTraceHook(ctx context.Context) zerolog.HookFunc {
 			}
 		}
 	}
+}
+
+func GetFuncName() string {
+	pc := make([]uintptr, 15)
+	n := runtime.Callers(2, pc)
+	frames := runtime.CallersFrames(pc[:n])
+	frame, _ := frames.Next()
+	return frame.Function
+	//return fmt.Sprintf("%s:%d %s", frame.File, frame.Line, frame.Function)
 }
