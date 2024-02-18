@@ -4,9 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"net/http"
-	"strconv"
-
 	"github.com/gin-gonic/gin"
 	"github.com/shoppinglist/config"
 	"github.com/shoppinglist/db"
@@ -14,6 +11,9 @@ import (
 	"github.com/shoppinglist/models"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
+	"net/http"
+	"strconv"
+	"time"
 )
 
 type ItemHandler interface {
@@ -25,8 +25,8 @@ type ItemHandler interface {
 
 type itemHandler struct {
 	genericHandler
-	bought     sql.NullBool
-	apiCounter metric.Int64Counter
+	bought   sql.NullBool
+	apiCalls metric.Int64Histogram
 }
 
 func NewItemHandler(ctx context.Context, label string, bought sql.NullBool) (ItemHandler, error) {
@@ -39,10 +39,10 @@ func NewItemHandler(ctx context.Context, label string, bought sql.NullBool) (Ite
 	}
 
 	var err error
-	h.apiCounter, err = h.config.Meter.Int64Counter(
-		"api.counter",
-		metric.WithDescription("Number of API calls."),
-		metric.WithUnit("{call}"),
+	h.apiCalls, err = h.config.Meter.Int64Histogram(
+		"api.calls",
+		metric.WithDescription("API calls histogram"),
+		metric.WithUnit("ms"),
 	)
 	if err != nil {
 		return nil, err
@@ -148,13 +148,12 @@ type PaginationQuery struct {
 }
 
 func (h *itemHandler) GetItems(c *gin.Context) {
-	ctx, span, _, def := h.start(c, log.GetFuncName())
+	fn := log.GetFuncName()
+	ctx, span, _, def := h.start(c, fn)
 	defer def()
 
-	h.apiCounter.Add(ctx, 1,
-		metric.WithAttributes(attribute.String("handlerLabel", h.label)))
-
 	span.AddEvent("Started")
+	start := time.Now()
 
 	var p PaginationQuery
 	if err := c.ShouldBindQuery(&p); err != nil {
@@ -181,7 +180,14 @@ func (h *itemHandler) GetItems(c *gin.Context) {
 		h.err(c, "getting items", err)
 	}
 	c.Header("X-Total-Count", strconv.Itoa(total))
-	h.res(c, itemsOut)
 
-	c.Status(http.StatusOK)
+	end := time.Now()
+	dur := end.Sub(start)
+	h.apiCalls.Record(ctx, dur.Milliseconds(),
+		metric.WithAttributes(
+			attribute.String("label", h.label),
+			attribute.String("func", fn),
+		))
+
+	h.res(c, itemsOut)
 }
