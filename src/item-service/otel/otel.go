@@ -160,10 +160,19 @@ func newMeterProvider(ctx context.Context, cfg *config.Config) (*metric.MeterPro
 		}
 	}
 
+	r, err := resource.New(ctx,
+		resource.WithAttributes(semconv.ServiceName(config.Get(ctx).ServiceName)),
+		resource.WithAttributes(semconv.ServiceVersion(config.Get(ctx).ServiceVersion)),
+	)
+	if err != nil {
+		log.Logger(ctx).Err(err).Msg("resource.New")
+		return nil, err
+	}
 	meterProvider := metric.NewMeterProvider(
 		metric.WithReader(metric.NewPeriodicReader(metricExporter,
 			// Default is 1m. Set to 3s for demonstrative purposes.
 			metric.WithInterval(3*time.Second))),
+		metric.WithResource(r),
 	)
 	return meterProvider, nil
 }
