@@ -72,4 +72,4 @@ src/item-service/__debug_bin*
 
 *.log
 
-tmp
+devops/otel/local/grafana/grafana.ini
