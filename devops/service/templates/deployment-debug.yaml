@@ -19,10 +19,25 @@ spec:
         debug: "true"
     spec:
       containers:
+      - name: fluentbit
+        image: grafana/fluent-bit-plugin-loki:main
+        imagePullPolicy: IfNotPresent         
+        ports:
+          - name: metrics
+            containerPort: 2020
+            protocol: TCP
+        volumeMounts:
+          - name: config-volume
+            mountPath: /fluent-bit/etc/
+          - name: log-volume
+            mountPath: var/log/shoppinglist
       - image: "oltur/{{ .Values.SERVICE_NAME }}:{{ .Values.SERVICE_VERSION }}"
         name: {{ .Values.SERVICE_NAME }}
         resources: {}
         imagePullPolicy: Always
+        volumeMounts:
+          - name: log-volume
+            mountPath: var/log/shoppinglist
         ports:
           - containerPort: 80
         env:
@@ -41,4 +56,16 @@ spec:
             value: {{ .Values.SERVICE_NAME }}
           - name : "SERVICE_VERSION"
             value: {{ .Values.SERVICE_VERSION }}
+          - name: "OTEL_COLLECTOR_HOST"
+            value: {{ .Values.OTEL_COLLECTOR_HOST }}
+          - name: "PORT"
+            value: "{{ .Values.PORT }}"
+          - name: "COUCHBASE_RAM_QUOTA_MB"
+            value: "{{ .Values.COUCHBASE_RAM_QUOTA_MB }}",
+        volumes:
+          - name: log-volume
+            emptyDir: {}
+          - name: config-volume
+            configMap:
+              name: fluent-bit-config         
 {{end}}

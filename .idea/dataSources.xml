@@ -1,11 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="DataSourceManagerImpl" format="xml" multifile-model="true">
-    <data-source source="LOCAL" name="@localhost" uuid="6b252eba-7b9a-4a9d-b64d-63e53ffbe7f4">
+    <data-source source="LOCAL" name="@localhost" uuid="e0a0fa35-10d6-4d99-90a9-6a5e2830d455">
       <driver-ref>couchbase_query</driver-ref>
       <synchronize>true</synchronize>
       <jdbc-driver>com.intellij.CouchbaseJdbcDriver</jdbc-driver>
       <jdbc-url>jdbc:couchbase:localhost</jdbc-url>
+      <jdbc-additional-properties>
+        <property name="com.intellij.clouds.kubernetes.db.host.port" />
+        <property name="com.intellij.clouds.kubernetes.db.enabled" value="false" />
+        <property name="com.intellij.clouds.kubernetes.db.resource.type" value="Deployment" />
+        <property name="com.intellij.clouds.kubernetes.db.container.port" />
+      </jdbc-additional-properties>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
   </component>

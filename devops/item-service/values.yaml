@@ -1,8 +1,12 @@
-COUCHBASE_CONNECTION_STRING: couchbase://couchbase-0000.couchbase
+COUCHBASE_CONNECTION_STRING: couchbase://couchbase.couchbase
 COUCHBASE_USERNAME: Administrator
-COUCHBASE_PASSWORD:
+COUCHBASE_PASSWORD: 
 COUCHBASE_BUCKET: default
 SERVICE_VERSION: latest
 DEBUG: false
 SERVICE_NAME: item-service
-REPLICAS: 5
+REPLICAS: 2
+OTEL_COLLECTOR_HOST: my-opentelemetry-collector.default.svc.cluster.local
+# OTEL_COLLECTOR_HOST: otel-collector.default.svc.cluster.local
+COUCHBASE_RAM_QUOTA_MB: 200
+PORT: 80

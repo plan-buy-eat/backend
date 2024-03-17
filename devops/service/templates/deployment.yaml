@@ -18,9 +18,31 @@ spec:
         date: "{{ now | unixEpoch }}"
     spec:
       containers:
-      - image: "oltur/{{ .Values.SERVICE_NAME }}:{{ .Values.SERVICE_VERSION }}"
+      - name: fluentbit
+        image: grafana/fluent-bit-plugin-loki:main
+        imagePullPolicy: IfNotPresent         
+        ports:
+          - name: metrics
+            containerPort: 2020
+            protocol: TCP
+        volumeMounts:
+          - name: config-volume
+            mountPath: /fluent-bit/etc/
+          - name: log-volume
+            mountPath: var/log/shoppinglist
+      - resources:
+          requests:
+            memory: "512Mi"
+            cpu: "100m"
+          limits:
+            memory: "1024Mi"
+            cpu: "500m"
+        image: "oltur/{{ .Values.SERVICE_NAME }}:{{ .Values.SERVICE_VERSION }}"
         name: {{ .Values.SERVICE_NAME }}
         imagePullPolicy: Always
+        volumeMounts:
+          - name: log-volume
+            mountPath: var/log/shoppinglist
         ports:
           - containerPort: 80
         env:
@@ -37,6 +59,18 @@ spec:
           value: {{ .Values.COUCHBASE_BUCKET }}
         - name : "SERVICE_NAME"
           value: {{ .Values.SERVICE_NAME }}
-        - name : "SERVICE_VERSION"
+        - name: "SERVICE_VERSION"
           value: {{ .Values.SERVICE_VERSION }}
+        - name: "OTEL_COLLECTOR_HOST"
+          value: {{ .Values.OTEL_COLLECTOR_HOST }}
+        - name: "PORT"
+          value: "{{ .Values.PORT }}"
+        - name: "COUCHBASE_RAM_QUOTA_MB"
+          value: "{{ .Values.COUCHBASE_RAM_QUOTA_MB }}"
+      volumes:
+        - name: log-volume
+          emptyDir: {}
+        - name: config-volume
+          configMap:
+            name: fluent-bit-config           
 {{end}}

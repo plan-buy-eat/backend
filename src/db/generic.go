@@ -6,18 +6,28 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/couchbase/gocb/v2"
-	"github.com/shoppinglist/log"
-	"github.com/shoppinglist/models"
-	"os"
+	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
+	"strconv"
 	"time"
+
+	"github.com/couchbase/gocb/v2"
+	"github.com/shoppinglist/config"
+	"github.com/shoppinglist/log"
 )
+
+func init() {
+	// Uncomment following line to enable logging
+	//gocb.SetLogger(gocb.DefaultStdioLogger())
+}
 
 type GenericDB interface {
 	Ping(ctx context.Context) (report string, err error)
 }
 
 type db struct {
+	label              string
 	cluster            *gocb.Cluster
 	collectionManager  *gocb.CollectionManager
 	searchIndexManager *gocb.SearchIndexManager
@@ -29,15 +39,19 @@ type db struct {
 	fields             []string
 
 	bought sql.NullBool
+
+	config *config.Config
 }
 
-func NewGenericDB(ctx context.Context) (GenericDB, error) {
+func NewGenericDB(ctx context.Context, label string, cfg *config.Config) (GenericDB, error) {
 	db := &db{
 		fields: []string{"title", "amount", "unit", "bought", "shop"},
 		bought: sql.NullBool{
 			Bool:  false,
 			Valid: false,
 		},
+		config: cfg,
+		label:  label,
 	}
 	err := db.init(ctx)
 	if err != nil {
@@ -48,15 +62,12 @@ func NewGenericDB(ctx context.Context) (GenericDB, error) {
 
 func (d *db) init(ctx context.Context) error {
 
-	// Uncomment following line to enable logging
-	//gocb.SetLogger(gocb.VerboseStdioLogger())
-
 	var err error
 
-	connectionString := os.Getenv("COUCHBASE_CONNECTION_STRING")
-	bucketName := os.Getenv("COUCHBASE_BUCKET")
-	username := os.Getenv("COUCHBASE_USERNAME")
-	password := os.Getenv("COUCHBASE_PASSWORD")
+	connectionString := d.config.CouchbaseConnectionString
+	bucketName := d.config.CouchbaseBucketName
+	username := d.config.CouchbaseUsername
+	password := d.config.CouchbasePassword
 
 	d.cluster, err = gocb.Connect(connectionString, gocb.ClusterOptions{
 		Authenticator: gocb.PasswordAuthenticator{
@@ -65,11 +76,41 @@ func (d *db) init(ctx context.Context) error {
 		},
 	})
 	if err != nil {
-		log.Logger().Err(err)
+		log.Logger(ctx).Err(err).Msg("gocb.Connect")
 		return err
 	}
 
 	d.searchIndexManager = d.cluster.SearchIndexes()
+	if err != nil {
+		log.Logger(ctx).Err(err).Msg("d.cluster.SearchIndexes")
+		return err
+	}
+
+	tmpBucket := d.cluster.Bucket(bucketName)
+	err = tmpBucket.WaitUntilReady(5*time.Second, &gocb.WaitUntilReadyOptions{
+		Context: ctx,
+	})
+	if err != nil {
+		RAMQuotaMB, err := strconv.Atoi(d.config.CouchbaseRamQuotaMB)
+		if err != nil {
+			log.Logger(ctx).Err(err).Msg("RAMQuotaMB")
+			return err
+		}
+		err = d.cluster.Buckets().CreateBucket(gocb.CreateBucketSettings{
+			BucketSettings: gocb.BucketSettings{
+				Name:         bucketName,
+				RAMQuotaMB:   uint64(RAMQuotaMB),
+				FlushEnabled: true,
+				BucketType:   gocb.CouchbaseBucketType,
+			},
+		}, &gocb.CreateBucketOptions{
+			Context: ctx,
+		})
+		if err != nil && !errors.Is(err, gocb.ErrBucketExists) {
+			log.Logger(ctx).Err(err).Msg("cluster.Buckets().CreateBucket")
+			return err
+		}
+	}
 
 	d.bucket = d.cluster.Bucket(bucketName)
 
@@ -77,7 +118,7 @@ func (d *db) init(ctx context.Context) error {
 		Context: ctx,
 	})
 	if err != nil {
-		log.Logger().Err(err)
+		log.Logger(ctx).Err(err).Msg("bucket.WaitUntilReady")
 		return err
 	}
 
@@ -87,7 +128,7 @@ func (d *db) init(ctx context.Context) error {
 		&gocb.CreateScopeOptions{Context: ctx})
 	if err != nil {
 		if !errors.Is(err, gocb.ErrScopeExists) {
-			log.Logger().Err(err)
+			log.Logger(ctx).Err(err).Msg("collectionManager.CreateScope")
 			return err
 		}
 	}
@@ -101,7 +142,7 @@ func (d *db) init(ctx context.Context) error {
 		})
 		if err != nil {
 			if !errors.Is(err, gocb.ErrCollectionExists) {
-				log.Logger().Err(err)
+				log.Logger(ctx).Err(err).Msg("collectionManager.CreateCollection")
 				return err
 			}
 		}
@@ -115,7 +156,7 @@ func (d *db) init(ctx context.Context) error {
 			Context:        ctx,
 		}); err != nil {
 			if !errors.Is(err, gocb.ErrIndexExists) {
-				log.Logger().Err(err)
+				log.Logger(ctx).Err(err).Msg("indexManager.CreatePrimaryIndex")
 				return err
 			}
 		}
@@ -128,7 +169,7 @@ func (d *db) init(ctx context.Context) error {
 					Context:        ctx,
 				}); err != nil {
 				if !errors.Is(err, gocb.ErrIndexExists) {
-					log.Logger().Err(err)
+					log.Logger(ctx).Err(err).Msg("indexManager.CreateIndex")
 					return err
 				}
 			}
@@ -198,133 +239,13 @@ func (d *db) Ping(ctx context.Context) (report string, err error) {
 	return string(b), err
 }
 
-func InitDB(ctx context.Context) (err error) {
-	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
-	defer cancel()
+func (d *db) start(ctx context.Context, name string) (context.Context, trace.Span, zerolog.Logger, func()) {
+	ctx, span := d.config.Tracer.Start(ctx, name)
+	span.SetAttributes(attribute.String("handlerLabel", d.label))
+	l := log.Logger(ctx).With().Any("handlerLabel", d.label).Logger()
 
-	itemsDB, err := NewItemsDB(ctx, sql.NullBool{
-		Bool:  true,
-		Valid: true,
-	})
-	if err != nil {
-		log.Logger().Error().Err(err)
-		return
+	f := func() {
+		span.End()
 	}
-	items := []*models.Item{
-		{
-			Title:  "Cottage Cheese",
-			Amount: 1,
-			Unit:   "pc",
-			Bought: false,
-			Shop:   "Rewe",
-		},
-		{
-			Title:  "Avocado",
-			Amount: 2,
-			Unit:   "pc",
-			Bought: true,
-			Shop:   "Edeka",
-		},
-		{
-			Title:  "Banana",
-			Amount: 1,
-			Unit:   "pc",
-			Bought: true,
-			Shop:   "Edeka",
-		},
-		{
-			Title:  "Milk",
-			Amount: 2,
-			Unit:   "pc",
-			Bought: true,
-			Shop:   "Edeka",
-		},
-		{
-			Title:  "Bread",
-			Amount: 1,
-			Unit:   "pc",
-			Bought: true,
-			Shop:   "Edeka",
-		},
-		{
-			Title:  "Sosages",
-			Amount: 1,
-			Unit:   "pc",
-			Bought: true,
-			Shop:   "Edeka",
-		},
-		{
-			Title:  "Meat",
-			Amount: 1,
-			Unit:   "pc",
-			Bought: true,
-			Shop:   "Edeka",
-		},
-		{
-			Title:  "Creme Fraiche",
-			Amount: 1,
-			Unit:   "pc",
-			Bought: true,
-			Shop:   "Edeka",
-		},
-		{
-			Title:  "Wine",
-			Amount: 1,
-			Unit:   "pc",
-			Bought: true,
-			Shop:   "Edeka",
-		},
-		{
-			Title:  "Napkins",
-			Amount: 1,
-			Unit:   "pc",
-			Bought: true,
-			Shop:   "Edeka",
-		},
-		{
-			Title:  "Tomatoes",
-			Amount: 1,
-			Unit:   "pc",
-			Bought: true,
-			Shop:   "Edeka",
-		},
-		{
-			Title:  "Cucumber",
-			Amount: 1,
-			Unit:   "pc",
-			Bought: true,
-			Shop:   "Edeka",
-		},
-		{
-			Title:  "Ananas",
-			Amount: 1,
-			Unit:   "pc",
-			Bought: true,
-			Shop:   "Edeka",
-		},
-		{
-			Title:  "Plums",
-			Amount: 1,
-			Unit:   "pc",
-			Bought: true,
-			Shop:   "Edeka",
-		},
-		{
-			Title:  "Clementines",
-			Amount: 1,
-			Unit:   "pc",
-			Bought: true,
-			Shop:   "Edeka",
-		},
-	}
-
-	for _, item := range items {
-		_, err = itemsDB.UpsertItem(ctx, Key("item", item.Title), item)
-		if err != nil {
-			log.Logger().Error().Err(err)
-			return err
-		}
-	}
-
-	return
+	return ctx, span, l, f
 }

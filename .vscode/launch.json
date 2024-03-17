@@ -1,0 +1,22 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "Launch Package",
+        "type": "go",
+        "request": "launch",
+        "mode": "debug",
+        "program": "${workspaceFolder}/src/item-service",
+        "env": {
+          "COUCHBASE_CONNECTION_STRING":"couchbase://localhost/",
+          "COUCHBASE_USERNAME":"Administrator",
+          "COUCHBASE_PASSWORD":"Qwerty123",
+          "COUCHBASE_BUCKET":"default",
+          "OTEL_COLLECTOR_HOST":"localhost",
+          "SERVICE_NAME": "item-service",
+          "PORT":"81",
+          "COUCHBASE_RAM_QUOTA_MB": "100"
+        }
+      }
+    ]
+  }

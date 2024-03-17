@@ -471,7 +471,7 @@ rolebindings: {}
 # TLS Certs that will be used to encrypt traffic between operator and couchbase
 tls:
   # -- Enable to auto create certs
-  generate: false
+  generate: true
   # -- Legacy TLS configuration with static format which requires PKCS#1 formatted keys.
   # Legacy format is used implicitly during upgrade when old static keys exist.
   # The default is 'false' which supports additional formats and multiple root CAs.
@@ -522,7 +522,7 @@ syncGateway:
   monitoring:
     prometheus:
       # -- Defines whether Prometheus metric collection is enabled
-      enabled: false
+      enabled: true
       # -- Image used by the Sync Gateway to perform metric collection
       # (injected as a "sidecar" in each Sync Gateway Pod)
       image:
@@ -646,7 +646,7 @@ buckets:
     # than or equal to 100Mi.  More info:
     # https://kubernetes.io/docs/concepts/configuration/manage-resources-
     # containers/#resource-units-in-kubernetes
-    memoryQuota: 100Mi
+    memoryQuota: 200Mi
     # -- Replicas defines how many copies of documents Couchbase server
     # maintains.  This directly affects how fault tolerant a Couchbase cluster
     # is.  With a single replica, the cluster can tolerate one data pod going
@@ -841,7 +841,7 @@ cluster:
     # a quantity greater than or equal to 256Mi.  This field defaults to 256Mi.
     # More info: https://kubernetes.io/docs/concepts/configuration/manage-
     # resources-containers/#resource-units-in-kubernetes
-    dataServiceMemoryQuota: 256Mi
+    dataServiceMemoryQuota: 1024Mi
     # -- EventingServiceMemQuota is the amount of memory that should be
     # allocated to the eventing service. This value is per-pod, and only
     # applicable to pods belonging to server classes running the eventing
@@ -849,14 +849,14 @@ cluster:
     # This field defaults to 256Mi.  More info:
     # https://kubernetes.io/docs/concepts/configuration/manage-resources-
     # containers/#resource-units-in-kubernetes
-    eventingServiceMemoryQuota: 256Mi
+    eventingServiceMemoryQuota: 512Mi
     # -- IndexServiceMemQuota is the amount of memory that should be allocated
     # to the index service. This value is per-pod, and only applicable to pods
     # belonging to server classes running the index service.  This field must be
     # a quantity greater than or equal to 256Mi.  This field defaults to 256Mi.
     # More info: https://kubernetes.io/docs/concepts/configuration/manage-
     # resources-containers/#resource-units-in-kubernetes
-    indexServiceMemoryQuota: 256Mi
+    indexServiceMemoryQuota: 512Mi
     # -- DEPRECATED - by indexer. The index storage mode to use for secondary
     # indexing.  This field must be one of "memory_optimized" or "plasma",
     # defaulting to "memory_optimized".  This field is immutable and cannot be
@@ -918,7 +918,7 @@ cluster:
     # 256Mi.  More info:
     # https://kubernetes.io/docs/concepts/configuration/manage-resources-
     # containers/#resource-units-in-kubernetes
-    searchServiceMemoryQuota: 256Mi
+    searchServiceMemoryQuota: 512Mi
   # -- EnableOnlineVolumeExpansion enables online expansion of Persistent
   # Volumes. You can only expand a PVC if its storage class's
   # "allowVolumeExpansion" field is set to true. Additionally, Kubernetes
@@ -1186,7 +1186,7 @@ cluster:
       - search
       - analytics
       - eventing
-      size: 4
+      size: 3
   # -- SoftwareUpdateNotifications enables software update notifications in the
   # UI. When enabled, the UI will alert when a Couchbase server upgrade is
   # available.

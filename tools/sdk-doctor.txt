@@ -1,1 +1,1 @@
-./sdk-doctor-linux diagnose couchbases://couchbase-0000.couchbase/default  -u Administrator -p V0RUQ3Ba``
+./sdk-doctor-linux diagnose couchbases://couchbase-0001.couchbase/default  -u Administrator -p dGRvQkpZ

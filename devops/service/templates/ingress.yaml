@@ -21,7 +21,7 @@ metadata:
     traefik.ingress.kubernetes.io/router.entrypoints: web
 spec:
   rules:
-#    - host: k8smaster.cluster-prod.turevskiy.kharkiv.ua
+#    - host: master.cluster-prod.turevskiy.kharkiv.ua
 #    - host: kubernetes.docker.internal
   - http:
       paths:

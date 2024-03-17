@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -8,8 +9,11 @@ import (
 	"github.com/shoppinglist/db"
 	"github.com/shoppinglist/log"
 	"github.com/shoppinglist/models"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 	"net/http"
 	"strconv"
+	"time"
 )
 
 type ItemHandler interface {
@@ -17,32 +21,53 @@ type ItemHandler interface {
 	GetItem(c *gin.Context)
 	BuyItem(c *gin.Context)
 	RestoreItem(c *gin.Context)
+	ToggleItem(c *gin.Context)
+	DeleteItem(c *gin.Context)
+	CreateItem(c *gin.Context)
+	EditItem(c *gin.Context)
 }
 
 type itemHandler struct {
 	genericHandler
-	bought sql.NullBool
+	bought     sql.NullBool
+	boughtLast bool
+	apiCalls   metric.Int64Histogram
 }
 
-func NewItemHandler(bought sql.NullBool) ItemHandler {
-	return &itemHandler{
-		genericHandler{
-			config: config.Get(),
+func NewItemHandler(ctx context.Context, label string, bought sql.NullBool, boughtLast bool) (ItemHandler, error) {
+	h := &itemHandler{
+		genericHandler: genericHandler{
+			config: config.Get(ctx),
+			label:  label,
 		},
-		bought,
+		bought:     bought,
+		boughtLast: boughtLast,
 	}
+
+	var err error
+	h.apiCalls, err = h.config.Meter.Int64Histogram(
+		"api.calls",
+		metric.WithDescription("API calls histogram"),
+		metric.WithUnit("ms"),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return h, nil
 }
 
 func (h *itemHandler) GetItem(c *gin.Context) {
-	ctx := c.Request.Context()
-	c.Header("Content-Type", "application/json")
+	ctx, _, _, def := h.start(c, log.GetFuncName())
+	defer def()
+	log.Logger(ctx).Info().Msg("Start")
 	id := c.Param("id")
 	if id == "" {
 		h.errWithStatus(c, http.StatusBadRequest, "bad request", fmt.Errorf("no id specified"))
 	}
-	itemsDB, err := db.NewItemsDB(ctx, h.bought)
+	itemsDB, err := db.NewItemsDB(ctx, h.config, h.bought)
 	if err != nil {
-		h.err(c, "getting db", err)
+		h.err(c, "NewItemsDB", err)
 		return
 	}
 
@@ -56,19 +81,21 @@ func (h *itemHandler) GetItem(c *gin.Context) {
 }
 
 func (h *itemHandler) BuyItem(c *gin.Context) {
-	ctx := c.Request.Context()
-	c.Header("Content-Type", "application/json")
+	ctx, _, _, def := h.start(c, log.GetFuncName())
+	defer def()
+	log.Logger(ctx).Info().Msg("Start")
 	id := c.Param("id")
 	if id == "" {
 		h.errWithStatus(c, http.StatusBadRequest, "bad request", fmt.Errorf("no id specified"))
 	}
-	itemsDB, err := db.NewItemsDB(ctx, h.bought)
+	itemsDB, err := db.NewItemsDB(ctx, h.config, h.bought)
 	if err != nil {
-		h.err(c, "getting db", err)
+		h.err(c, "NewItemsDB", err)
 		return
 	}
 
-	err = itemsDB.BuyItem(ctx, id, true)
+	b := true
+	err = itemsDB.BuyItem(ctx, id, &b)
 	if err != nil {
 		h.err(c, "buying an item", err)
 		return
@@ -77,19 +104,21 @@ func (h *itemHandler) BuyItem(c *gin.Context) {
 }
 
 func (h *itemHandler) RestoreItem(c *gin.Context) {
-	ctx := c.Request.Context()
-	c.Header("Content-Type", "application/json")
+	ctx, _, _, def := h.start(c, log.GetFuncName())
+	defer def()
+	log.Logger(ctx).Info().Msg("Start")
 	id := c.Param("id")
 	if id == "" {
 		h.errWithStatus(c, http.StatusBadRequest, "bad request", fmt.Errorf("no id specified"))
 	}
-	itemsDB, err := db.NewItemsDB(ctx, h.bought)
+	itemsDB, err := db.NewItemsDB(ctx, h.config, h.bought)
 	if err != nil {
-		h.err(c, "getting db", err)
+		h.err(c, "NewItemsDB", err)
 		return
 	}
 
-	err = itemsDB.BuyItem(ctx, id, false)
+	b := false
+	err = itemsDB.BuyItem(ctx, id, &b)
 	if err != nil {
 		h.err(c, "restoring an item", err)
 		return
@@ -97,26 +126,104 @@ func (h *itemHandler) RestoreItem(c *gin.Context) {
 	h.resWithStatus(c, http.StatusOK, models.ID{ID: id})
 }
 
-//func (h *itemHandler) DeleteItem(c *gin.Context) {
-//	ctx := c.Request.Context()
-//	c.Header("Content-Type", "application/json")
-//	id := c.Param("id")
-//	if id == "" {
-//		h.errWithStatus(c, http.StatusBadRequest, "bad request", fmt.Errorf("no id specified"))
-//	}
-//	itemsDB, err := db.NewItemsDB(ctx, h.bought)
-//	if err != nil {
-//		h.err(c, "getting db", err)
-//		return
-//	}
-//
-//	err = itemsDB.DeleteItem(ctx, id)
-//	if err != nil {
-//		h.err(c, "getting an item", err)
-//		return
-//	}
-//	h.resWithStatus(c, http.StatusNoContent, nil)
-//}
+func (h *itemHandler) ToggleItem(c *gin.Context) {
+	ctx, _, _, def := h.start(c, log.GetFuncName())
+	defer def()
+	log.Logger(ctx).Info().Msg("Start")
+	id := c.Param("id")
+	if id == "" {
+		h.errWithStatus(c, http.StatusBadRequest, "bad request", fmt.Errorf("no id specified"))
+	}
+	itemsDB, err := db.NewItemsDB(ctx, h.config, h.bought)
+	if err != nil {
+		h.err(c, "NewItemsDB", err)
+		return
+	}
+
+	err = itemsDB.BuyItem(ctx, id, nil)
+	if err != nil {
+		h.err(c, "toggling an item", err)
+		return
+	}
+	h.resWithStatus(c, http.StatusOK, models.ID{ID: id})
+}
+
+func (h *itemHandler) DeleteItem(c *gin.Context) {
+	ctx, _, _, def := h.start(c, log.GetFuncName())
+	defer def()
+	id := c.Param("id")
+	if id == "" {
+		h.errWithStatus(c, http.StatusBadRequest, "bad request", fmt.Errorf("no id specified"))
+	}
+	itemsDB, err := db.NewItemsDB(ctx, h.config, h.bought)
+	if err != nil {
+		h.err(c, "NewItemsDB", err)
+		return
+	}
+
+	err = itemsDB.DeleteItem(ctx, id)
+	if err != nil {
+		h.err(c, "getting an item", err)
+		return
+	}
+	h.resWithStatus(c, http.StatusNoContent, nil)
+}
+
+func (h *itemHandler) CreateItem(c *gin.Context) {
+	ctx, _, _, def := h.start(c, log.GetFuncName())
+	defer def()
+	log.Logger(ctx).Info().Msg("Start")
+	itemsDB, err := db.NewItemsDB(ctx, h.config, h.bought)
+	if err != nil {
+		h.err(c, "NewItemsDB", err)
+		return
+	}
+	var item models.ItemWithID
+	err = c.BindJSON(&item)
+	if err != nil {
+		h.err(c, "BindJSON", err)
+		return
+	}
+	item.ID = ""
+
+	err = itemsDB.UpsertItem(ctx, &item)
+	if err != nil {
+		h.err(c, "UpsertItem", err)
+		return
+	}
+
+	h.res(c, item)
+}
+
+func (h *itemHandler) EditItem(c *gin.Context) {
+	ctx, _, _, def := h.start(c, log.GetFuncName())
+	defer def()
+	log.Logger(ctx).Info().Msg("Start")
+	id := c.Param("id")
+	if id == "" {
+		h.errWithStatus(c, http.StatusBadRequest, "bad request", fmt.Errorf("no id specified"))
+	}
+	itemsDB, err := db.NewItemsDB(ctx, h.config, h.bought)
+	if err != nil {
+		h.err(c, "NewItemsDB", err)
+		return
+	}
+	var item models.ItemWithID
+	err = c.BindJSON(&item)
+	if err != nil {
+		h.err(c, "BindJSON", err)
+		return
+	}
+	item.ID = id
+
+	err = itemsDB.UpsertItem(ctx, &item)
+	if err != nil {
+		h.err(c, "UpsertItem", err)
+		return
+	}
+
+	h.res(c, item)
+}
 
 type PaginationQuery struct {
 	Start int    `form:"_start"`
@@ -127,9 +234,12 @@ type PaginationQuery struct {
 }
 
 func (h *itemHandler) GetItems(c *gin.Context) {
-	ctx := c.Request.Context()
+	fn := log.GetFuncName()
+	ctx, span, _, def := h.start(c, fn)
+	defer def()
 
-	log.Logger().Info().Any("env", c.Request.URL).Msgf("Env")
+	span.AddEvent("Started")
+	start := time.Now()
 
 	var p PaginationQuery
 	if err := c.ShouldBindQuery(&p); err != nil {
@@ -137,10 +247,9 @@ func (h *itemHandler) GetItems(c *gin.Context) {
 		return
 	}
 
-	c.Header("Content-Type", "application/json")
-	itemsDB, err := db.NewItemsDB(ctx, h.bought)
+	itemsDB, err := db.NewItemsDB(ctx, h.config, h.bought)
 	if err != nil {
-		h.err(c, "getting db", err)
+		h.err(c, "NewItemsDB", err)
 		return
 	}
 
@@ -152,12 +261,19 @@ func (h *itemHandler) GetItems(c *gin.Context) {
 		Sort:  p.Sort,
 		Order: p.Order,
 		Query: p.Query,
-	}, p.Query)
+	}, p.Query, h.boughtLast)
 	if err != nil {
 		h.err(c, "getting items", err)
 	}
 	c.Header("X-Total-Count", strconv.Itoa(total))
-	h.res(c, itemsOut)
 
-	c.Status(http.StatusOK)
+	end := time.Now()
+	dur := end.Sub(start)
+	h.apiCalls.Record(ctx, dur.Milliseconds(),
+		metric.WithAttributes(
+			attribute.String("label", h.label),
+			attribute.String("func", fn),
+		))
+
+	h.res(c, itemsOut)
 }

@@ -4,28 +4,41 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/couchbase/gocb/v2"
-	"github.com/rs/xid"
-	"github.com/shoppinglist/log"
-	"github.com/shoppinglist/models"
+	"golang.org/x/sync/errgroup"
 	"strings"
 	"time"
+
+	"github.com/couchbase/gocb/v2"
+	"github.com/rs/xid"
+	"github.com/shoppinglist/config"
+	"github.com/shoppinglist/log"
+	"github.com/shoppinglist/models"
 )
 
 type ItemsDB interface {
-	UpsertItem(ctx context.Context, inId string, item *models.Item) (id string, err error)
-	GetItem(ctx context.Context, id string) (item *models.Item, err error)
-	GetItems(ctx context.Context, q *PaginationQuery, searchQuery string) (items []*models.ItemWithID, total int, err error)
-	//SearchItems(ctx context.Context, query string) (items []*models.ItemWithID, err error)
+	UpsertItem(ctx context.Context, item *models.ItemWithID) (err error)
+	GetItem(ctx context.Context, id string) (item *models.ItemWithID, err error)
+	GetItems(ctx context.Context, q *PaginationQuery, searchQuery string, boughtLast bool) (items []*models.ItemWithID, total int, err error)
 	DeleteItem(ctx context.Context, id string) (err error)
-	BuyItem(ctx context.Context, id string, bought bool) (err error)
+	BuyItem(ctx context.Context, id string, bought *bool) (err error)
+	InitDB(ctx context.Context) (err error)
 }
 
-func NewItemsDB(ctx context.Context, bought sql.NullBool) (ItemsDB, error) {
+func NewItemsDB(ctx context.Context, cfg *config.Config, bought sql.NullBool) (ItemsDB, error) {
+	label := "items"
+	if bought.Valid {
+		if bought.Bool {
+			label = "bought"
+		} else {
+			label = "toBuy"
+		}
+	}
 	db := &db{
 		collectionName: "items",
 		fields:         []string{"title", "amount", "unit", "bought", "shop"},
 		bought:         bought,
+		config:         cfg,
+		label:          label,
 	}
 	err := db.init(ctx)
 	if err != nil {
@@ -34,43 +47,55 @@ func NewItemsDB(ctx context.Context, bought sql.NullBool) (ItemsDB, error) {
 	return db, nil
 }
 
-func (d *db) UpsertItem(ctx context.Context, inId string, item *models.Item) (outId string, err error) {
-	outId = inId
+func (d *db) UpsertItem(ctx context.Context, item *models.ItemWithID) (err error) {
+	ctx, _, _, def := d.start(ctx, log.GetFuncName())
+	defer def()
+
+	outId := item.ID
 	if outId == "" {
-		outId = xid.New().String()
+		outId = "item:" + xid.New().String()
 	}
 	if item == nil {
-		item = &models.Item{Base: models.Base{}}
+		item = &models.ItemWithID{Item: models.Item{Base: models.Base{}}}
 	}
 	item.Base.Updated = time.Now().UTC().UnixMilli()
 	if item.Base.Created == 0 {
 		item.Base.Created = time.Now().UTC().UnixMilli()
 	}
 
-	_, err = d.collection.Upsert(outId, item,
+	_, err = d.collection.Upsert(outId, item.Item,
 		&gocb.UpsertOptions{Context: ctx})
 	if err != nil {
-		log.Logger().Err(err)
+		log.Logger(ctx).Err(err)
 		return
-
 	}
-	log.Logger().Info().Msgf("Item created: %s\n", inId)
+	log.Logger(ctx).Info().Msgf("Item created: %s\n", item.ID)
+	var item2 *models.ItemWithID
+	item2, err = d.GetItem(ctx, outId)
+	if err != nil {
+		log.Logger(ctx).Err(err)
+		return
+	}
+	*item = *item2
 	return
 }
 
-func (d *db) GetItem(ctx context.Context, id string) (item *models.Item, err error) {
+func (d *db) GetItem(ctx context.Context, id string) (item *models.ItemWithID, err error) {
+	ctx, _, _, def := d.start(ctx, log.GetFuncName())
+	defer def()
+
 	getResult, err := d.collection.Get(id,
 		&gocb.GetOptions{Context: ctx})
 	if err != nil {
-		log.Logger().Err(err)
+		log.Logger(ctx).Err(err)
 		return
 
 	}
 
-	item = &models.Item{}
+	item = &models.ItemWithID{}
 	err = getResult.Content(item)
 	if err != nil {
-		log.Logger().Err(err)
+		log.Logger(ctx).Err(err)
 		return
 	}
 
@@ -79,18 +104,34 @@ func (d *db) GetItem(ctx context.Context, id string) (item *models.Item, err err
 			return nil, nil
 		}
 	}
+	item.ID = id
 
 	return
 }
 
-func (d *db) BuyItem(ctx context.Context, id string, bought bool) (err error) {
+func (d *db) BuyItem(ctx context.Context, id string, bought *bool) (err error) {
+	ctx, _, _, def := d.start(ctx, log.GetFuncName())
+	defer def()
+
+	var b bool
+	if bought != nil {
+		b = *bought
+	} else {
+		var item *models.ItemWithID
+		item, err = d.GetItem(ctx, id)
+		if err != nil {
+			log.Logger(ctx).Err(err).Msg("MutateIn")
+			return
+		}
+		b = !item.Bought
+	}
 
 	mops := []gocb.MutateInSpec{
-		gocb.ReplaceSpec("bought", bought, &gocb.ReplaceSpecOptions{}),
+		gocb.ReplaceSpec("bought", b, &gocb.ReplaceSpecOptions{}),
 	}
 	if d.collection == nil {
 		err = fmt.Errorf("collection is nil")
-		log.Logger().Err(err)
+		log.Logger(ctx).Err(err)
 		return
 	}
 	_, err = d.collection.MutateIn(id, mops, &gocb.MutateInOptions{
@@ -98,14 +139,16 @@ func (d *db) BuyItem(ctx context.Context, id string, bought bool) (err error) {
 		//Timeout: 10050 * time.Millisecond,
 	})
 	if err != nil {
-		log.Logger().Err(err)
+		log.Logger(ctx).Err(err).Msg("MutateIn")
 		return
 	}
 
 	return
 }
 
-func (d *db) GetItems(ctx context.Context, q *PaginationQuery, searchQuery string) (items []*models.ItemWithID, total int, err error) {
+func (d *db) GetItems(ctx context.Context, q *PaginationQuery, searchQuery string, boughtLast bool) (items []*models.ItemWithID, total int, err error) {
+	ctx, _, _, def := d.start(ctx, log.GetFuncName())
+	defer def()
 
 	searchQuery = strings.TrimSpace(searchQuery)
 
@@ -130,11 +173,26 @@ func (d *db) GetItems(ctx context.Context, q *PaginationQuery, searchQuery strin
 	if q.Order == "" {
 		q.Order = "ASC"
 	}
-	if q.Sort != "" {
-		query += fmt.Sprintf("\nORDER BY x.%s %s, meta(x).id ASC", q.Sort, q.Order)
-	} else {
-		query += fmt.Sprintf("\nORDER BY meta(x).id ASC")
+
+	order := ""
+
+	if boughtLast {
+		//if order != "" {
+		//	order += ", "
+		//}
+		order += fmt.Sprintf("x.bought asc")
 	}
+	if q.Sort != "" {
+		if order != "" {
+			order += ", "
+		}
+		order += fmt.Sprintf("x.%s %s", q.Sort, q.Order)
+	}
+
+	if order != "" {
+		query += fmt.Sprintf("\nORDER BY " + order)
+	}
+
 	if q.Start != 0 {
 		query += fmt.Sprintf("\nOFFSET %d ", q.Start)
 	}
@@ -142,115 +200,80 @@ func (d *db) GetItems(ctx context.Context, q *PaginationQuery, searchQuery strin
 		query += fmt.Sprintf("\nLIMIT %d ", q.End-q.Start)
 	}
 
-	log.Logger().Info().Msgf("Query: %s", query)
-	params := map[string]interface{}{
-		"searchQuery": searchQuery,
-	}
-	queryResult, err := d.scope.Query(query, &gocb.QueryOptions{Adhoc: true, Context: ctx, NamedParameters: params})
-	if err != nil {
-		log.Logger().Err(err)
-		return
-	}
-	items = []*models.ItemWithID{}
-	for queryResult.Next() {
-		var item models.ItemWithID
-		err = queryResult.Row(&item)
+	eg, ctx := errgroup.WithContext(ctx)
+
+	eg.Go(func() (err error) {
+		ctx, span := d.config.Tracer.Start(ctx, "main")
+		defer span.End()
+
+		l := log.Logger(ctx).With().Any("query", "main").Logger()
+		l.Info().Msgf("Main query: %s", query)
+		params := map[string]interface{}{
+			"searchQuery": searchQuery,
+		}
+		queryResult, err := d.scope.Query(query, &gocb.QueryOptions{Adhoc: true, Context: ctx, NamedParameters: params})
 		if err != nil {
-			log.Logger().Err(err)
+			l.Err(err).Msg("Query")
 			return
 		}
-		items = append(items, &item)
-	}
-	if err = queryResult.Err(); err != nil {
-		log.Logger().Err(err)
+		items = []*models.ItemWithID{}
+		for queryResult.Next() {
+			var item models.ItemWithID
+			err = queryResult.Row(&item)
+			if err != nil {
+				l.Err(err).Msg("Row")
+				return
+			}
+			items = append(items, &item)
+		}
+		if err = queryResult.Err(); err != nil {
+			l.Err(err).Msg("queryResult.Err")
+			return
+		}
 		return
-	}
+	})
 
-	paramsTotal := map[string]interface{}{
-		"searchQuery": searchQuery,
-	}
-	queryResultTotal, err := d.scope.Query(queryTotal, &gocb.QueryOptions{Adhoc: true, Context: ctx, NamedParameters: paramsTotal})
-	if err != nil {
-		log.Logger().Err(err)
+	eg.Go(func() (err error) {
+		ctx, span := d.config.Tracer.Start(ctx, "total")
+		defer span.End()
+		l := log.Logger(ctx).With().Any("query", "total").Logger()
+
+		l.Info().Msgf("Total query: %s", queryTotal)
+		paramsTotal := map[string]interface{}{
+			"searchQuery": searchQuery,
+		}
+		queryResultTotal, err := d.scope.Query(queryTotal, &gocb.QueryOptions{Adhoc: true, Context: ctx, NamedParameters: paramsTotal})
+		if err != nil {
+			l.Err(err).Msg("Query")
+			return
+		}
+		var totalResult models.Total
+		err = queryResultTotal.One(&totalResult)
+		if err != nil {
+			l.Err(err).Msg("queryResultTotal.One")
+			return
+		}
+		total = totalResult.Total
+		return
+	})
+
+	if err = eg.Wait(); err != nil {
 		return
 	}
-	var totalResult models.Total
-	err = queryResultTotal.One(&totalResult)
-	if err != nil {
-		log.Logger().Err(err)
-		return
-	}
-	total = totalResult.Total
 
 	return
 }
 
-//func (d *db) SearchItems(ctx context.Context, query string) (items []*models.ItemWithID, err error) {
-//	matchResult, err := d.cluster.SearchQuery(
-//		"title-index",
-//		search.NewConjunctionQuery(
-//			search.NewMatchQuery(query),
-//			//search.NewDateRangeQuery().Start("2019-01-01", true).End("2029-02-01", false),
-//		),
-//		&gocb.SearchOptions{
-//			Limit:   10000,
-//			Fields:  d.fields,
-//			Context: ctx,
-//		},
-//	)
-//	if err != nil {
-//		return nil, err
-//
-//	}
-//
-//	itemSearchResults := make([]*models.ItemSearchResult, 0)
-//	// Print each found Row
-//	for matchResult.Next() {
-//		var itemSearchResult models.ItemSearchResult
-//		row := matchResult.Row()
-//		err = row.Fields(&itemSearchResult)
-//		if err != nil {
-//			log.Logger().Err(err)
-//			return
-//		}
-//		itemSearchResult.ID = row.ID
-//		itemSearchResult.Score = row.Score
-//		itemSearchResults = append(itemSearchResults, &itemSearchResult)
-//	}
-//	if err = matchResult.Err(); err != nil {
-//		log.Logger().Err(err)
-//		return
-//	}
-//
-//	slices.SortFunc(itemSearchResults, func(i, j *models.ItemSearchResult) int {
-//		return int(j.Score - i.Score)
-//	})
-//
-//	items = make([]*models.ItemWithID, 0, len(itemSearchResults))
-//	for _, result := range itemSearchResults {
-//		items = append(items, &models.ItemWithID{
-//			Item: models.Item{
-//				Title:  result.Title,
-//				Amount: result.Amount,
-//				Unit:   result.Unit,
-//				Bought: result.Bought,
-//				Shop:   result.Shop,
-//			},
-//			ID: result.ID,
-//		})
-//	}
-//
-//	return
-//
-//}
-
 func (d *db) DeleteItem(ctx context.Context, id string) (err error) {
+	ctx, _, _, def := d.start(ctx, log.GetFuncName())
+	defer def()
+
 	_, err = d.collection.Remove(id,
 		&gocb.RemoveOptions{Context: ctx})
 	if err != nil {
-		log.Logger().Err(err)
+		log.Logger(ctx).Err(err)
 		return
 	}
-	log.Logger().Info().Msgf("Item deleted: %s\n", id)
+	log.Logger(ctx).Info().Msgf("Item deleted: %s\n", id)
 	return
 }
