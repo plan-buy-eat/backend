@@ -180,7 +180,8 @@ expose-traefik-dashboard:
 
 .PHONY: install-couchbase-local
 install-couchbase-local:
-	docker run -d --name couchbase -p 8091-8094:8091-8094 -p 11210:11210 couchbase
+	# docker run -d --name couchbase -p 8091-8094:8091-8094 -p 11210:11210 couchbase
+	docker run -d --name db -p 8091-8096:8091-8096 -p 11210-11211:11210-11211 couchbase
 
 .PHONY: install-couchbase
 install-couchbase:

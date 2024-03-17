@@ -21,21 +21,27 @@ type ItemHandler interface {
 	GetItem(c *gin.Context)
 	BuyItem(c *gin.Context)
 	RestoreItem(c *gin.Context)
+	ToggleItem(c *gin.Context)
+	DeleteItem(c *gin.Context)
+	CreateItem(c *gin.Context)
+	EditItem(c *gin.Context)
 }
 
 type itemHandler struct {
 	genericHandler
-	bought   sql.NullBool
-	apiCalls metric.Int64Histogram
+	bought     sql.NullBool
+	boughtLast bool
+	apiCalls   metric.Int64Histogram
 }
 
-func NewItemHandler(ctx context.Context, label string, bought sql.NullBool) (ItemHandler, error) {
+func NewItemHandler(ctx context.Context, label string, bought sql.NullBool, boughtLast bool) (ItemHandler, error) {
 	h := &itemHandler{
 		genericHandler: genericHandler{
 			config: config.Get(ctx),
 			label:  label,
 		},
-		bought: bought,
+		bought:     bought,
+		boughtLast: boughtLast,
 	}
 
 	var err error
@@ -88,7 +94,8 @@ func (h *itemHandler) BuyItem(c *gin.Context) {
 		return
 	}
 
-	err = itemsDB.BuyItem(ctx, id, true)
+	b := true
+	err = itemsDB.BuyItem(ctx, id, &b)
 	if err != nil {
 		h.err(c, "buying an item", err)
 		return
@@ -110,9 +117,32 @@ func (h *itemHandler) RestoreItem(c *gin.Context) {
 		return
 	}
 
-	err = itemsDB.BuyItem(ctx, id, false)
+	b := false
+	err = itemsDB.BuyItem(ctx, id, &b)
 	if err != nil {
 		h.err(c, "restoring an item", err)
+		return
+	}
+	h.resWithStatus(c, http.StatusOK, models.ID{ID: id})
+}
+
+func (h *itemHandler) ToggleItem(c *gin.Context) {
+	ctx, _, _, def := h.start(c, log.GetFuncName())
+	defer def()
+	log.Logger(ctx).Info().Msg("Start")
+	id := c.Param("id")
+	if id == "" {
+		h.errWithStatus(c, http.StatusBadRequest, "bad request", fmt.Errorf("no id specified"))
+	}
+	itemsDB, err := db.NewItemsDB(ctx, h.config, h.bought)
+	if err != nil {
+		h.err(c, "NewItemsDB", err)
+		return
+	}
+
+	err = itemsDB.BuyItem(ctx, id, nil)
+	if err != nil {
+		h.err(c, "toggling an item", err)
 		return
 	}
 	h.resWithStatus(c, http.StatusOK, models.ID{ID: id})
@@ -137,6 +167,62 @@ func (h *itemHandler) DeleteItem(c *gin.Context) {
 		return
 	}
 	h.resWithStatus(c, http.StatusNoContent, nil)
+}
+
+func (h *itemHandler) CreateItem(c *gin.Context) {
+	ctx, _, _, def := h.start(c, log.GetFuncName())
+	defer def()
+	log.Logger(ctx).Info().Msg("Start")
+	itemsDB, err := db.NewItemsDB(ctx, h.config, h.bought)
+	if err != nil {
+		h.err(c, "NewItemsDB", err)
+		return
+	}
+	var item models.ItemWithID
+	err = c.BindJSON(&item)
+	if err != nil {
+		h.err(c, "BindJSON", err)
+		return
+	}
+	item.ID = ""
+
+	err = itemsDB.UpsertItem(ctx, &item)
+	if err != nil {
+		h.err(c, "UpsertItem", err)
+		return
+	}
+
+	h.res(c, item)
+}
+
+func (h *itemHandler) EditItem(c *gin.Context) {
+	ctx, _, _, def := h.start(c, log.GetFuncName())
+	defer def()
+	log.Logger(ctx).Info().Msg("Start")
+	id := c.Param("id")
+	if id == "" {
+		h.errWithStatus(c, http.StatusBadRequest, "bad request", fmt.Errorf("no id specified"))
+	}
+	itemsDB, err := db.NewItemsDB(ctx, h.config, h.bought)
+	if err != nil {
+		h.err(c, "NewItemsDB", err)
+		return
+	}
+	var item models.ItemWithID
+	err = c.BindJSON(&item)
+	if err != nil {
+		h.err(c, "BindJSON", err)
+		return
+	}
+	item.ID = id
+
+	err = itemsDB.UpsertItem(ctx, &item)
+	if err != nil {
+		h.err(c, "UpsertItem", err)
+		return
+	}
+
+	h.res(c, item)
 }
 
 type PaginationQuery struct {
@@ -175,7 +261,7 @@ func (h *itemHandler) GetItems(c *gin.Context) {
 		Sort:  p.Sort,
 		Order: p.Order,
 		Query: p.Query,
-	}, p.Query)
+	}, p.Query, h.boughtLast)
 	if err != nil {
 		h.err(c, "getting items", err)
 	}

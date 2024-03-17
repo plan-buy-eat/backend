@@ -16,11 +16,11 @@ import (
 )
 
 type ItemsDB interface {
-	UpsertItem(ctx context.Context, inId string, item *models.Item) (id string, err error)
-	GetItem(ctx context.Context, id string) (item *models.Item, err error)
-	GetItems(ctx context.Context, q *PaginationQuery, searchQuery string) (items []*models.ItemWithID, total int, err error)
+	UpsertItem(ctx context.Context, item *models.ItemWithID) (err error)
+	GetItem(ctx context.Context, id string) (item *models.ItemWithID, err error)
+	GetItems(ctx context.Context, q *PaginationQuery, searchQuery string, boughtLast bool) (items []*models.ItemWithID, total int, err error)
 	DeleteItem(ctx context.Context, id string) (err error)
-	BuyItem(ctx context.Context, id string, bought bool) (err error)
+	BuyItem(ctx context.Context, id string, bought *bool) (err error)
 	InitDB(ctx context.Context) (err error)
 }
 
@@ -47,34 +47,40 @@ func NewItemsDB(ctx context.Context, cfg *config.Config, bought sql.NullBool) (I
 	return db, nil
 }
 
-func (d *db) UpsertItem(ctx context.Context, inId string, item *models.Item) (outId string, err error) {
+func (d *db) UpsertItem(ctx context.Context, item *models.ItemWithID) (err error) {
 	ctx, _, _, def := d.start(ctx, log.GetFuncName())
 	defer def()
 
-	outId = inId
+	outId := item.ID
 	if outId == "" {
 		outId = xid.New().String()
 	}
 	if item == nil {
-		item = &models.Item{Base: models.Base{}}
+		item = &models.ItemWithID{Item: models.Item{Base: models.Base{}}}
 	}
 	item.Base.Updated = time.Now().UTC().UnixMilli()
 	if item.Base.Created == 0 {
 		item.Base.Created = time.Now().UTC().UnixMilli()
 	}
 
-	_, err = d.collection.Upsert(outId, item,
+	_, err = d.collection.Upsert(outId, item.Item,
 		&gocb.UpsertOptions{Context: ctx})
 	if err != nil {
 		log.Logger(ctx).Err(err)
 		return
-
 	}
-	log.Logger(ctx).Info().Msgf("Item created: %s\n", inId)
+	log.Logger(ctx).Info().Msgf("Item created: %s\n", item.ID)
+	var item2 *models.ItemWithID
+	item2, err = d.GetItem(ctx, outId)
+	if err != nil {
+		log.Logger(ctx).Err(err)
+		return
+	}
+	*item = *item2
 	return
 }
 
-func (d *db) GetItem(ctx context.Context, id string) (item *models.Item, err error) {
+func (d *db) GetItem(ctx context.Context, id string) (item *models.ItemWithID, err error) {
 	ctx, _, _, def := d.start(ctx, log.GetFuncName())
 	defer def()
 
@@ -86,7 +92,7 @@ func (d *db) GetItem(ctx context.Context, id string) (item *models.Item, err err
 
 	}
 
-	item = &models.Item{}
+	item = &models.ItemWithID{}
 	err = getResult.Content(item)
 	if err != nil {
 		log.Logger(ctx).Err(err)
@@ -98,16 +104,30 @@ func (d *db) GetItem(ctx context.Context, id string) (item *models.Item, err err
 			return nil, nil
 		}
 	}
+	item.ID = id
 
 	return
 }
 
-func (d *db) BuyItem(ctx context.Context, id string, bought bool) (err error) {
+func (d *db) BuyItem(ctx context.Context, id string, bought *bool) (err error) {
 	ctx, _, _, def := d.start(ctx, log.GetFuncName())
 	defer def()
 
+	var b bool
+	if bought != nil {
+		b = *bought
+	} else {
+		var item *models.ItemWithID
+		item, err = d.GetItem(ctx, id)
+		if err != nil {
+			log.Logger(ctx).Err(err).Msg("MutateIn")
+			return
+		}
+		b = !item.Bought
+	}
+
 	mops := []gocb.MutateInSpec{
-		gocb.ReplaceSpec("bought", bought, &gocb.ReplaceSpecOptions{}),
+		gocb.ReplaceSpec("bought", b, &gocb.ReplaceSpecOptions{}),
 	}
 	if d.collection == nil {
 		err = fmt.Errorf("collection is nil")
@@ -119,14 +139,14 @@ func (d *db) BuyItem(ctx context.Context, id string, bought bool) (err error) {
 		//Timeout: 10050 * time.Millisecond,
 	})
 	if err != nil {
-		log.Logger(ctx).Err(err)
+		log.Logger(ctx).Err(err).Msg("MutateIn")
 		return
 	}
 
 	return
 }
 
-func (d *db) GetItems(ctx context.Context, q *PaginationQuery, searchQuery string) (items []*models.ItemWithID, total int, err error) {
+func (d *db) GetItems(ctx context.Context, q *PaginationQuery, searchQuery string, boughtLast bool) (items []*models.ItemWithID, total int, err error) {
 	ctx, _, _, def := d.start(ctx, log.GetFuncName())
 	defer def()
 
@@ -154,14 +174,23 @@ func (d *db) GetItems(ctx context.Context, q *PaginationQuery, searchQuery strin
 		q.Order = "ASC"
 	}
 
-	query += fmt.Sprintf("\nORDER BY 1=1")
-	if d.bought.Valid {
-		query += fmt.Sprintf(", x.bought asc")
+	order := ""
+
+	if boughtLast {
+		//if order != "" {
+		//	order += ", "
+		//}
+		order += fmt.Sprintf("x.bought asc")
 	}
 	if q.Sort != "" {
-		query += fmt.Sprintf(", x.%s %s, meta(x).id ASC", q.Sort, q.Order)
-	} else {
-		query += fmt.Sprintf(", meta(x).id ASC")
+		if order != "" {
+			order += ", "
+		}
+		order += fmt.Sprintf("x.%s %s", q.Sort, q.Order)
+	}
+
+	if order != "" {
+		query += fmt.Sprintf("\nORDER BY " + order)
 	}
 
 	if q.Start != 0 {

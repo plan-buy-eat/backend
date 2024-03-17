@@ -5126,7 +5126,7 @@ func (d *db) InitDB(ctx context.Context) (err error) {
 	}
 
 	for _, item := range items {
-		_, err = d.UpsertItem(ctx, Key("item", item.Title), item)
+		err = d.UpsertItem(ctx, &models.ItemWithID{ID: Key("item", item.Title), Item: *item})
 		if err != nil {
 			log.Logger(ctx).Error().Err(err)
 			return err

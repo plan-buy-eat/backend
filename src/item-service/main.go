@@ -51,7 +51,9 @@ func main() {
 	// Handle shutdown properly so nothing leaks.
 	defer func() {
 		err = errors.Join(err, otelShutdown(context.Background()))
-		log.Logger(ctx).Fatal().Err(err).Msg("otelShutdown")
+		if err != nil {
+			log.Logger(ctx).Fatal().Err(err).Msg("otelShutdown")
+		}
 	}()
 	c.Tracer = tracer
 	c.Meter = meter
@@ -109,7 +111,9 @@ func main() {
 		sql.NullBool{
 			Bool:  false,
 			Valid: true,
-		})
+		},
+		false,
+	)
 	if err != nil {
 		log.Logger(ctx).Fatal().Err(err).Msg("ToBuyHandler")
 	}
@@ -123,7 +127,9 @@ func main() {
 		sql.NullBool{
 			Bool:  true,
 			Valid: true,
-		})
+		},
+		false,
+	)
 	if err != nil {
 		log.Logger(ctx).Fatal().Err(err).Msg("BoughtHandler")
 	}
@@ -136,14 +142,33 @@ func main() {
 		"allItems",
 		sql.NullBool{
 			Valid: false,
-		})
+		},
+		true,
+	)
 	if err != nil {
 		log.Logger(ctx).Fatal().Err(err).Msg("AllItemsHandler")
 	}
 	allItems := r.Group("/items")
 	allItems.GET("", allItemsHandler.GetItems)
 	allItems.GET("/:id", allItemsHandler.GetItem)
-	allItems.DELETE("/:id", allItemsHandler.RestoreItem)
+	allItems.DELETE("/:id", allItemsHandler.ToggleItem)
+
+	inventoryHandler, err := handlers.NewItemHandler(ctx,
+		"allItems",
+		sql.NullBool{
+			Valid: false,
+		},
+		false,
+	)
+	if err != nil {
+		log.Logger(ctx).Fatal().Err(err).Msg("AllItemsHandler")
+	}
+	inventory := r.Group("/inventory")
+	inventory.GET("", inventoryHandler.GetItems)
+	inventory.GET("/:id", inventoryHandler.GetItem)
+	inventory.PUT("/:id", inventoryHandler.EditItem)
+	inventory.POST("", inventoryHandler.CreateItem)
+	inventory.DELETE("/:id", inventoryHandler.DeleteItem)
 
 	srv := &http.Server{
 		Addr:    listenAddress,
