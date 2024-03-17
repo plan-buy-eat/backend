@@ -53,7 +53,7 @@ func (d *db) UpsertItem(ctx context.Context, item *models.ItemWithID) (err error
 
 	outId := item.ID
 	if outId == "" {
-		outId = xid.New().String()
+		outId = "item:" + xid.New().String()
 	}
 	if item == nil {
 		item = &models.ItemWithID{Item: models.Item{Base: models.Base{}}}
